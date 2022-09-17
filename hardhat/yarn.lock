@@ -659,6 +659,13 @@
   resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-4.7.3.tgz#939534757a81f8d69cc854c7692805684ff3111e"
   integrity sha512-dGRS0agJzu8ybo44pCIf3xBaPQN/65AIXNgK8+4gzKd5kbvlqyxryUYVLJv7fK98Seyd2hDZzVEHSWAh0Bt1Yw==
 
+"@polydocs/contracts@^1.0.1":
+  version "1.0.1"
+  resolved "https://registry.yarnpkg.com/@polydocs/contracts/-/contracts-1.0.1.tgz#025fd2508a279fee2b6fe577237aac8725524dcd"
+  integrity sha512-3IOMKeH20bimZUXwQr+5lptmyMcXKraSixXeMGjWjO6EN2HBiBFRyGA43s7lETFFa/8cd24zQ1757V/Do/kkqw==
+  dependencies:
+    "@types/mocha" "^9.1.1"
+
 "@scure/base@~1.1.0":
   version "1.1.1"
   resolved "https://registry.yarnpkg.com/@scure/base/-/base-1.1.1.tgz#ebb651ee52ff84f420097055f4bf46cfba403938"

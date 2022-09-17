@@ -5,8 +5,9 @@ pragma solidity ^0.8.9;
 // import "hardhat/console.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
+import "@polydocs/contracts/contracts/interfaces/MetadataURI.sol";
 
-contract Escrow {
+contract Escrow is MetadataURI {
     using Counters for Counters.Counter;
     // address public buyer;
     // address public seller;
@@ -97,6 +98,11 @@ contract Escrow {
         State status;
         bool buyerAccepted;
         bool sellerAccepted;
+        string sellerReviewUri;
+        string buyerReviewUri;
+        string arbiterReviewByBuyerUri;
+        string arbiterReviewBySellerUri;
+        string arbiterOpinionUri;
     }
 
     Job[] public jobs;
@@ -178,7 +184,19 @@ contract Escrow {
         );
     }
 
-    function offerAccepted(uint256 jobId) public {
+    function offerAccepted(uint256 jobId) external {
+        _offerAccepted(jobId, msg.sender);
+    }
+
+    function offerAccepted(
+        uint256 jobId,
+        address buyer,
+        string memory signature
+    ) external {
+        _offerAccepted(jobId, buyer);
+    }
+
+    function _offerAccepted(uint256 jobId, address buyer) internal {
         Job storage job = jobs[jobId];
         require(
             msg.sender == job.buyer,
