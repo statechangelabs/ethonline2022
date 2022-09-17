@@ -98,12 +98,16 @@ contract Escrow is MetadataURI {
         State status;
         bool buyerAccepted;
         bool sellerAccepted;
+        uint256 deliveryHeight;
+        uint256 dueHeight;
         string sellerReviewUri;
         string buyerReviewUri;
         string arbiterReviewByBuyerUri;
         string arbiterReviewBySellerUri;
         string arbiterOpinionUri;
     }
+
+    uint256 reviewBlocks = 1000;
 
     Job[] public jobs;
     IERC20 private USDC;
