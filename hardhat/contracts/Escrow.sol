@@ -7,82 +7,85 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 
 contract Escrow {
+    using Counters for Counters.Counter;
     // address public buyer;
     // address public seller;
     // address public arbiter;
     // uint public amount;
     // Counters private _counter;
     event BidCreated(
-        uint indexed jobID,
+        uint256 indexed jobID,
         address buyer,
         address seller,
         address arbiter,
-        uint amount
+        uint256 amount
     );
     event OfferCreated(
-        uint indexed jobID,
+        uint256 indexed jobID,
         address buyer,
         address seller,
         address arbiter,
-        uint amount
+        uint256 amount
     );
 
     event BidAccepted(
-        uint indexed jobID,
+        uint256 indexed jobID,
         address buyer,
         address seller,
         address arbiter,
-        uint amount
+        uint256 amount
     );
 
     event OfferAccepted(
-        uint indexed jobID,
+        uint256 indexed jobID,
         address buyer,
         address seller,
         address arbiter,
-        uint amount
+        uint256 amount
     );
 
     event Delivered(
-        uint indexed jobID,
+        uint256 indexed jobID,
         address buyer,
         address seller,
         address arbiter,
-        uint amount
+        uint256 amount
     );
 
     event Receipt(
-        uint indexed jobID,
+        uint256 indexed jobID,
         address buyer,
         address seller,
         address arbiter,
-        uint amount
+        uint256 amount
     );
 
     event Refunded(
-        uint indexed jobID,
+        uint256 indexed jobID,
         address buyer,
         address seller,
         address arbiter,
-        uint amount
+        uint256 amount
     );
 
     event Cancelled(
-        uint indexed jobID,
+        uint256 indexed jobID,
         address buyer,
         address seller,
         address arbiter,
-        uint amount
+        uint256 amount
     );
 
-    Counters private _counter;
+    Counters.Counter private _counter;
     enum State {
         AWAITING_ACCEPTANCE,
         AWAITING_DELIVERY,
         AWAITING_RECEIPT,
         COMPLETE,
         REFUNDED,
-        CANCELLED
+        CANCELLED,
+        IN_DISPUTE,
+        ARBITRATED
     }
 
     struct Job {
@@ -97,6 +100,7 @@ contract Escrow {
     }
 
     Job[] public jobs;
+    IERC20 private USDC;
 
     // State public currentState;
 
@@ -210,7 +214,7 @@ contract Escrow {
             "Escrow: Only the buyer can receive delivery"
         );
         job.status = State.COMPLETE;
-        USDC.transfer(address(this), job.seller, job.amount);
+        USDC.transferFrom(address(this), job.seller, job.amount);
         emit Receipt(jobId, job.buyer, job.seller, job.arbiter, job.amount);
     }
 
@@ -276,6 +280,169 @@ contract Escrow {
                 "Escrow: Only the buyer or seller can cancel the job"
             );
         }
+    }
+
+    function partialCompletion(uint256 jobId, uint256 amount) public {
+        Job storage job = jobs[jobId];
+        require(
+            msg.sender == job.seller || msg.sender == job.buyer,
+            "Escrow: Only the parties can offer a partial delivery"
+        );
+        require(
+            amount <= job.amount,
+            "Escrow: The amount cannot be greater than the job amount"
+        );
+        require(
+            job.status == State.AWAITING_DELIVERY ||
+                job.status == State.AWAITING_RECEIPT,
+            "Escrow: Job must be in progress"
+        );
+        if (job.partialOffer == amount) {
+            require(
+                job.partialOfferer != msg.sender,
+                "Escrow: Cannot offer the same amount twice"
+            );
+            //settle it
+            job.status = State.COMPLETE;
+            emit Completed(
+                jobId,
+                job.buyer,
+                job.seller,
+                job.arbiter,
+                job.amount
+            );
+            if (job.partialOffer > 0 && job.partialOffer <= job.amount)
+                USDC.transferFrom(address(this), job.seller, job.partialOffer);
+            if (job.partialOffer < job.amount)
+                USDC.transferFrom(
+                    address(this).job.seller,
+                    job.amount - job.partialOffer
+                );
+            job.partialOffer = amount;
+        } else {
+            job.partialOffer = amount;
+            job.partialOfferer = msg.sender;
+            emit PartialOffered(jobId, msg.sender, amount);
+        }
+    }
+
+    function dispute(uint256 jobId) public {
+        Job storage job = jobs[jobId];
+        require(msg.sender == job.buyer, "Escrow: Only the buyer can dispute");
+        job.status = State.DISPUTED;
+        emit Disputed(jobId, job.buyer, job.seller, job.arbiter, job.amount);
+    }
+
+    function arbitrate(
+        uint256 jobId,
+        uint256 amount,
+        string opinionURI
+    ) {
+        Job storage job = jobs[jobId];
+        require(
+            job.status == State.DISPUTED,
+            "Escrow: Job must be disputed to arbitrate"
+        );
+        require(
+            job.arbiter == msg.sender,
+            "Escrow: Only the arbiter can arbitrate"
+        );
+        require(
+            amount <= job.amount,
+            "Escrow: The amount cannot be greater than the job amount"
+        );
+        job.status = State.COMPLETE;
+        if (amount > 0)
+            USDC.transferFrom(address(this), job.seller, job.partialOffer);
+        if (amount < job.amount)
+            USDC.transferFrom(
+                address(this).job.seller,
+                job.amount - job.partialOffer
+            );
+        emit Arbitrated(
+            jobId,
+            job.buyer,
+            job.seller,
+            job.arbiter,
+            job.amount,
+            opinionURI
+        );
+    }
+
+    function reviewBuyer(
+        uint256 jobId,
+        uint8 score,
+        string reviewURI
+    ) public {
+        Job storage job = jobs[jobId];
+        require(
+            job.status == State.COMPLETE,
+            "Escrow: Job must complete to review"
+        );
+        require(
+            job.seller == msg.sender,
+            "Escrow: Only the seller can review the buyer"
+        );
+        job.status = State.COMPLETE;
+        emit Reviewed(
+            jobId,
+            job.buyer,
+            job.seller,
+            job.arbiter,
+            job.amount,
+            opinionURI
+        );
+    }
+
+    function reviewSeller(
+        uint256 jobId,
+        uint8 score,
+        string reviewURI
+    ) public {
+        Job storage job = jobs[jobId];
+        require(
+            job.status == State.COMPLETE,
+            "Escrow: Job must complete to review"
+        );
+        require(
+            job.buyer == msg.sender,
+            "Escrow: Only the buyer can review the seller"
+        );
+        job.status = State.COMPLETE;
+        emit Reviewed(
+            jobId,
+            job.buyer,
+            job.seller,
+            job.arbiter,
+            job.amount,
+            opinionURI
+        );
+    }
+
+    function reviewArbiter(
+        uint256 jobId,
+        uint8 score,
+        string reviewURI
+    ) public {
+        Job storage job = jobs[jobId];
+        require(
+            job.status == State.COMPLETE &&
+                job.arbitrated = true,
+            "Escrow: Job must arbitrated to review"
+        );
+        require(
+            job.buyer == msg.sender || job.seller == msg.sender,
+            "Escrow: Only the buyer or seller can review the arbiter"
+        );
+        job.status = State.COMPLETE;
+        emit Reviewed(
+            jobId,
+            job.buyer,
+            job.seller,
+            job.arbiter,
+            job.amount,
+            opinionURI
+        );
     }
 
     // function
