@@ -297,10 +297,7 @@ contract Escrow is MetadataURI, Ownable {
 
     function _acceptBid(uint256 jobId, address seller) internal {
         Job storage job = jobs[jobId];
-        require(
-            seller == job.seller, //seller == job.seller??
-            "Only the seller can accept the bid"
-        );
+        require(seller == job.seller);
         job.sellerAccepted = true;
         require(job.buyerAccepted && job.sellerAccepted);
         job.status = State.AWAITING_DELIVERY;
@@ -371,10 +368,7 @@ contract Escrow is MetadataURI, Ownable {
 
     function _offerAccepted(uint256 jobId, address buyer) internal {
         Job storage job = jobs[jobId];
-        require(
-            buyer == job.buyer, // buyer == job.buyer ??
-            "Only the buyer can accept the offer"
-        );
+        require(buyer == job.buyer);
         job.buyerAccepted = true;
         require(job.buyerAccepted && job.sellerAccepted);
         USDC.transferFrom(buyer, address(this), job.amount);
@@ -406,10 +400,7 @@ contract Escrow is MetadataURI, Ownable {
 
     function _assertDelivery(uint256 jobId, address seller) internal {
         Job storage job = jobs[jobId];
-        require(
-            seller == job.seller, // seller == job.seller ??
-            "Only the seller can assert delivery"
-        );
+        require(seller == job.seller);
         job.status = State.AWAITING_RECEIPT;
         emit Delivered(jobId);
         // , job.buyer, job.seller, job.arbiter, job.amount);
@@ -433,7 +424,7 @@ contract Escrow is MetadataURI, Ownable {
 
     function _receiveDelivery(uint256 jobId, address buyer) internal {
         Job storage job = jobs[jobId];
-        require(buyer == job.buyer, "Only the buyer can receive delivery");
+        require(buyer == job.buyer);
         job.status = State.COMPLETE;
         USDC.transferFrom(address(this), job.seller, job.amount);
         emit Receipt(jobId);
@@ -506,10 +497,12 @@ contract Escrow is MetadataURI, Ownable {
                     );
                 }
             } else {
-                require(false, "Buyer cannot cancel the job in progress");
+                // Buyer cannot cancel the job in progress
+                require(false);
             }
         } else {
-            require(false, "Only the buyer or seller can cancel the job");
+            //Only the buyer or seller can cancel the job
+            require(false);
         }
     }
 
