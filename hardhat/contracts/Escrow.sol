@@ -183,14 +183,14 @@ contract Escrow is MetadataURI {
         Job memory newJob;
         _counter.increment();
         newJob.amount = amount;
-        newJob.buyer = msg.sender; //newJob.buyer = buyer; ??
+        newJob.buyer = buyer; //newJob.buyer = buyer; ??
         newJob.status = State.AWAITING_ACCEPTANCE;
         newJob.seller = seller;
         newJob.arbiter = arbiter;
         newJob.buyerAccepted = true;
         newJob.sellerAccepted = false;
         jobs.push(newJob);
-        USDC.transferFrom(msg.sender, address(this), amount); // USDC.transferFrom(buyer, address(this), amount); ??
+        USDC.transferFrom(buyer, address(this), amount); // USDC.transferFrom(buyer, address(this), amount); ??
         // require(condition, "Escrow: condition");
         emit BidCreated(
             _counter.current(),
@@ -217,7 +217,7 @@ contract Escrow is MetadataURI {
     function _acceptBid(uint256 jobId, address seller) internal {
         Job storage job = jobs[jobId];
         require(
-            msg.sender == job.seller, //seller == job.seller??
+            seller == job.seller, //seller == job.seller??
             "Escrow: Only the seller can accept the bid"
         );
         job.sellerAccepted = true;
@@ -255,7 +255,7 @@ contract Escrow is MetadataURI {
         newJob.amount = amount;
         newJob.buyer = buyer;
         newJob.status = State.AWAITING_ACCEPTANCE;
-        newJob.seller = msg.sender; // newJob.seller = seller; ??
+        newJob.seller = seller; // newJob.seller = seller; ??
         newJob.arbiter = arbiter;
         newJob.buyerAccepted = false;
         newJob.sellerAccepted = true;
@@ -285,12 +285,12 @@ contract Escrow is MetadataURI {
     function _offerAccepted(uint256 jobId, address buyer) internal {
         Job storage job = jobs[jobId];
         require(
-            msg.sender == job.buyer, // buyer == job.buyer ??
+            buyer == job.buyer, // buyer == job.buyer ??
             "Escrow: Only the buyer can accept the offer"
         );
         job.buyerAccepted = true;
         require(job.buyerAccepted && job.sellerAccepted);
-        USDC.transferFrom(msg.sender, address(this), job.amount);
+        USDC.transferFrom(buyer, address(this), job.amount);
         job.status = State.AWAITING_DELIVERY;
         emit OfferAccepted(
             jobId,
@@ -316,7 +316,7 @@ contract Escrow is MetadataURI {
     function _assertDelivery(uint256 jobId, address seller) internal {
         Job storage job = jobs[jobId];
         require(
-            msg.sender == job.seller, // seller == job.seller ??
+            seller == job.seller, // seller == job.seller ??
             "Escrow: Only the seller can assert delivery"
         );
         job.status = State.AWAITING_RECEIPT;
@@ -338,7 +338,7 @@ contract Escrow is MetadataURI {
     function _receiveDelivery(uint256 jobId, address buyer) internal {
         Job storage job = jobs[jobId];
         require(
-            msg.sender == job.buyer, // buyer == job.buyer ??
+            buyer == job.buyer, // buyer == job.buyer ??
             "Escrow: Only the buyer can receive delivery"
         );
         job.status = State.COMPLETE;
@@ -347,28 +347,20 @@ contract Escrow is MetadataURI {
     }
 
     function cancel(uint256 jobId) external {
-        _cancel(jobId);
+        _cancel(jobId, msg.sender);
     }
 
-    // function cancelForBuyer(
-    //     uint256 jobId,
-    //     address buyer,
-    //     string memory signature
-    // ) external {
-    //     _cancel(jobId, buyer);
-    // }
+    function cancelFor(
+        uint256 jobId,
+        address canceller,
+        string memory signature
+    ) external {
+        _cancel(jobId, canceller);
+    }
 
-    // function cancelForSeller(
-    //     uint256 jobId,
-    //     address seller,
-    //     string memory signature
-    // ) external {
-    //     _cancel(jobId, seller);
-    // }
-
-    function _cancel(uint256 jobId) internal {
+    function _cancel(uint256 jobId, address canceller) internal {
         Job storage job = jobs[jobId];
-        if (msg.sender == job.seller) {
+        if (canceller == job.seller) {
             require(
                 job.status == State.AWAITING_DELIVERY ||
                     job.status == State.AWAITING_RECEIPT ||
@@ -394,7 +386,7 @@ contract Escrow is MetadataURI {
                     job.amount
                 );
             }
-        } else if (msg.sender == job.buyer) {
+        } else if (canceller == job.buyer) {
             if (job.status == State.AWAITING_ACCEPTANCE) {
                 if (job.buyerAccepted) {
                     job.status = State.CANCELLED;
@@ -431,13 +423,26 @@ contract Escrow is MetadataURI {
     }
 
     function partialCompletion(uint256 jobId, uint256 amount) external {
+        _partialCompletion(jobId, amount, msg.sender);
+    }
+
+    function partialCompletionFor(
+        uint256 jobId,
+        uint256 amount,
+        address offerer,
+        string memory signature
+    ) external {
         _partialCompletion(jobId, amount);
     }
 
-    function _partialCompletion(uint256 jobId, uint256 amount) internal {
+    function _partialCompletion(
+        uint256 jobId,
+        uint256 amount,
+        address offerer
+    ) internal {
         Job storage job = jobs[jobId];
         require(
-            msg.sender == job.seller || msg.sender == job.buyer,
+            offerer == job.seller || offerer == job.buyer,
             "Escrow: Only the parties can offer a partial delivery"
         );
         require(
@@ -451,7 +456,7 @@ contract Escrow is MetadataURI {
         );
         if (job.partialOffer == amount) {
             require(
-                job.partialOfferer != msg.sender,
+                job.partialOfferer != offerer,
                 "Escrow: Cannot offer the same amount twice"
             );
             //settle it
@@ -473,18 +478,26 @@ contract Escrow is MetadataURI {
             job.partialOffer = amount;
         } else {
             job.partialOffer = amount;
-            job.partialOfferer = msg.sender;
-            emit PartialOffered(jobId, msg.sender, amount);
+            job.partialOfferer = offerer;
+            emit PartialOffered(jobId, offerer, amount);
         }
     }
 
     function dispute(uint256 jobId) external {
-        _dispute(jobId);
+        _dispute(jobId, msg.sender);
     }
 
-    function _dispute(uint256 jobId) internal {
+    function disputeFor(
+        uint256 jobId,
+        address disputor,
+        string memory signature
+    ) external {
+        _dispute(jobId, disputor);
+    }
+
+    function _dispute(uint256 jobId, address disputor) internal {
         Job storage job = jobs[jobId];
-        require(msg.sender == job.buyer, "Escrow: Only the buyer can dispute");
+        require(disputor == job.buyer, "Escrow: Only the buyer can dispute");
         job.status = State.DISPUTED;
         emit Disputed(jobId, job.buyer, job.seller, job.arbiter, job.amount);
     }
@@ -494,13 +507,24 @@ contract Escrow is MetadataURI {
         uint256 amount,
         string opinionURI
     ) external {
-        _arbitrate(jobId, amount, opinionURI);
+        _arbitrate(jobId, amount, opinionURI, msg.sender);
+    }
+
+    function arbitrateFor(
+        uint256 jobId,
+        uint256 amount,
+        string opinionURI,
+        address arbiter,
+        string memory signature
+    ) external {
+        _arbitrate(jobId, amount, opinionURI, arbiter);
     }
 
     function _arbitrate(
         uint256 jobId,
         uint256 amount,
-        string opinionURI
+        string opinionURI,
+        address arbiter
     ) internal {
         Job storage job = jobs[jobId];
         require(
@@ -508,7 +532,7 @@ contract Escrow is MetadataURI {
             "Escrow: Job must be disputed to arbitrate"
         );
         require(
-            job.arbiter == msg.sender,
+            job.arbiter == arbiter,
             "Escrow: Only the arbiter can arbitrate"
         );
         require(
