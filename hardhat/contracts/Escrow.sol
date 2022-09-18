@@ -6,6 +6,7 @@ pragma solidity ^0.8.9;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@polydocs/contracts/contracts/interfaces/MetadataURI.sol";
 
 contract Escrow is MetadataURI, Ownable {
@@ -142,14 +143,37 @@ contract Escrow is MetadataURI, Ownable {
         bool arbitrated;
         uint256 deliveryHeight;
         uint256 dueHeight;
+        // uint8 buyerScore;
+        // uint8 sellerScore;
+        // uint8 arbiterBuyerScore;
+        // uint8 arbiterSellerScore;
+        // string sellerReviewUri;
+        // string buyerReviewUri;
+        // string arbiterReviewByBuyerUri;
+        // string arbiterReviewBySellerUri;
+        // string arbiterOpinionUri;
+        uint256 partialOffer;
+        address partialOfferer;
+    }
+
+    struct JobReview {
+        uint8 buyerScore;
+        uint8 sellerScore;
+        uint8 arbiterBuyerScore;
+        uint8 arbiterSellerScore;
         string sellerReviewUri;
         string buyerReviewUri;
         string arbiterReviewByBuyerUri;
         string arbiterReviewBySellerUri;
         string arbiterOpinionUri;
-        uint256 partialOffer;
-        address partialOfferer;
     }
+
+    mapping(uint256 => JobReview) public jobReviews;
+    // mapping(uint256 => string) public buyerReviewUris;
+    // mapping(uint256 => string) public sellerReviewUris;
+    // mapping(uint256 => string) public arbiterReviewByBuyerUris;
+    // mapping(uint256 => string) public arbiterReviewBySellerUris;
+    // mapping(uint256 => string) public arbiterOpinionUris;
 
     uint256 reviewBlocks = 1000;
 
@@ -185,10 +209,6 @@ contract Escrow is MetadataURI, Ownable {
         _;
     }
 
-    /// @notice Function to set the contract URI
-    /// @dev This function lets the owner of the contract or a metasigner set the contract URI.
-    /// @dev It emits UpdatedURI event when URI is updated.
-    /// @param _newURI The URI to set.
     function setURI(string memory _newURI) external onlyMetaSigner {
         _uri = _newURI;
         _lastTermChange = block.number;
@@ -200,6 +220,15 @@ contract Escrow is MetadataURI, Ownable {
     /// @return _uri The contract URI.
     function URI() public view returns (string memory) {
         return _uri;
+    }
+
+    function checkSigner(string memory Uri, bytes memory _signature)
+        internal
+        pure
+        returns (address)
+    {
+        bytes32 hash = ECDSA.toEthSignedMessageHash(bytes(Uri));
+        return ECDSA.recover(hash, _signature);
     }
 
     function bid(
@@ -215,8 +244,12 @@ contract Escrow is MetadataURI, Ownable {
         address seller,
         address arbiter,
         address buyer,
-        string memory signature
+        // string memory message,
+        bytes memory signature
     ) external {
+        // require()
+        // string memory message = "I intend to bid for this job.";
+        require(buyer == checkSigner("I am hiring for this job.", signature));
         return _bid(amount, seller, arbiter, buyer);
     }
 
@@ -230,14 +263,14 @@ contract Escrow is MetadataURI, Ownable {
         Job memory newJob;
         _counter.increment();
         newJob.amount = amount;
-        newJob.buyer = buyer; //newJob.buyer = buyer; ??
+        newJob.buyer = buyer;
         newJob.status = State.AWAITING_ACCEPTANCE;
         newJob.seller = seller;
         newJob.arbiter = arbiter;
         newJob.buyerAccepted = true;
         newJob.sellerAccepted = false;
         jobs.push(newJob);
-        USDC.transferFrom(buyer, address(this), amount); // USDC.transferFrom(buyer, address(this), amount); ??
+        USDC.transferFrom(buyer, address(this), amount); // buyer needs to approve this contract to spend USDC
         // require(condition, "Escrow: condition");
         emit BidCreated(
             _counter.current()
@@ -256,8 +289,9 @@ contract Escrow is MetadataURI, Ownable {
     function acceptBidFor(
         uint256 jobID,
         address seller,
-        string memory signature
+        bytes memory signature
     ) external {
+        require(seller == checkSigner("I am accepting this job.", signature));
         _acceptBid(jobID, seller);
     }
 
@@ -265,7 +299,7 @@ contract Escrow is MetadataURI, Ownable {
         Job storage job = jobs[jobId];
         require(
             seller == job.seller, //seller == job.seller??
-            "Escrow: Only the seller can accept the bid"
+            "Only the seller can accept the bid"
         );
         job.sellerAccepted = true;
         require(job.buyerAccepted && job.sellerAccepted);
@@ -287,8 +321,9 @@ contract Escrow is MetadataURI, Ownable {
         address buyer,
         address arbiter,
         address seller,
-        string memory signature
+        bytes memory signature
     ) external {
+        require(seller == checkSigner("I am offering this job.", signature));
         _offer(amount, buyer, arbiter, seller);
     }
 
@@ -325,8 +360,12 @@ contract Escrow is MetadataURI, Ownable {
     function offerAcceptedFor(
         uint256 jobId,
         address buyer,
-        string memory signature
+        bytes memory signature
     ) external {
+        require(
+            buyer ==
+                checkSigner("I am accepting the offer for this job.", signature)
+        );
         _offerAccepted(jobId, buyer);
     }
 
@@ -334,7 +373,7 @@ contract Escrow is MetadataURI, Ownable {
         Job storage job = jobs[jobId];
         require(
             buyer == job.buyer, // buyer == job.buyer ??
-            "Escrow: Only the buyer can accept the offer"
+            "Only the buyer can accept the offer"
         );
         job.buyerAccepted = true;
         require(job.buyerAccepted && job.sellerAccepted);
@@ -356,8 +395,12 @@ contract Escrow is MetadataURI, Ownable {
     function assertDeliveryFor(
         uint256 jobId,
         address seller,
-        string memory signature
+        bytes memory signature
     ) external {
+        require(
+            seller ==
+                checkSigner("I am asserting delivery for this job.", signature)
+        );
         _assertDelivery(jobId, seller);
     }
 
@@ -365,7 +408,7 @@ contract Escrow is MetadataURI, Ownable {
         Job storage job = jobs[jobId];
         require(
             seller == job.seller, // seller == job.seller ??
-            "Escrow: Only the seller can assert delivery"
+            "Only the seller can assert delivery"
         );
         job.status = State.AWAITING_RECEIPT;
         emit Delivered(jobId);
@@ -379,17 +422,18 @@ contract Escrow is MetadataURI, Ownable {
     function recieveDeliveryFor(
         uint256 jobId,
         address buyer,
-        string memory signature
+        bytes memory signature
     ) external {
+        require(
+            buyer ==
+                checkSigner("I am receiving delivery for this job.", signature)
+        );
         _receiveDelivery(jobId, buyer);
     }
 
     function _receiveDelivery(uint256 jobId, address buyer) internal {
         Job storage job = jobs[jobId];
-        require(
-            buyer == job.buyer, // buyer == job.buyer ??
-            "Escrow: Only the buyer can receive delivery"
-        );
+        require(buyer == job.buyer, "Only the buyer can receive delivery");
         job.status = State.COMPLETE;
         USDC.transferFrom(address(this), job.seller, job.amount);
         emit Receipt(jobId);
@@ -403,8 +447,11 @@ contract Escrow is MetadataURI, Ownable {
     function cancelFor(
         uint256 jobId,
         address canceller,
-        string memory signature
+        bytes memory signature
     ) external {
+        require(
+            canceller == checkSigner("I am cancelling this job.", signature)
+        );
         _cancel(jobId, canceller);
     }
 
@@ -459,16 +506,10 @@ contract Escrow is MetadataURI, Ownable {
                     );
                 }
             } else {
-                require(
-                    false,
-                    "Escrow: Buyer cannot cancel the job in progress"
-                );
+                require(false, "Buyer cannot cancel the job in progress");
             }
         } else {
-            require(
-                false,
-                "Escrow: Only the buyer or seller can cancel the job"
-            );
+            require(false, "Only the buyer or seller can cancel the job");
         }
     }
 
@@ -480,8 +521,15 @@ contract Escrow is MetadataURI, Ownable {
         uint256 jobId,
         uint256 amount,
         address offerer,
-        string memory signature
+        bytes memory signature
     ) external {
+        require(
+            offerer ==
+                checkSigner(
+                    "I am asserting partial completion for this job.",
+                    signature
+                )
+        );
         _partialCompletion(jobId, amount, offerer);
     }
 
@@ -493,21 +541,21 @@ contract Escrow is MetadataURI, Ownable {
         Job storage job = jobs[jobId];
         require(
             offerer == job.seller || offerer == job.buyer,
-            "Escrow: Only the parties can offer a partial delivery"
+            "Only the parties can offer a partial delivery"
         );
         require(
             amount <= job.amount,
-            "Escrow: The amount cannot be greater than the job amount"
+            "The amount cannot be greater than the job amount"
         );
         require(
             job.status == State.AWAITING_DELIVERY ||
                 job.status == State.AWAITING_RECEIPT,
-            "Escrow: Job must be in progress"
+            "Job must be in progress"
         );
         if (job.partialOffer == amount) {
             require(
                 job.partialOfferer != offerer,
-                "Escrow: Cannot offer the same amount twice"
+                "Cannot offer the same amount twice"
             );
             //settle it
             job.status = State.COMPLETE;
@@ -543,14 +591,26 @@ contract Escrow is MetadataURI, Ownable {
     function disputeFor(
         uint256 jobId,
         address disputor,
-        string memory signature
+        bytes memory signature
     ) external {
+        require(
+            disputor ==
+                checkSigner(
+                    string(
+                        abi.encodePacked(
+                            "I am disputing the job with id: ",
+                            jobId
+                        )
+                    ),
+                    signature
+                )
+        );
         _dispute(jobId, disputor);
     }
 
     function _dispute(uint256 jobId, address disputor) internal {
         Job storage job = jobs[jobId];
-        require(disputor == job.buyer, "Escrow: Only the buyer can dispute");
+        require(disputor == job.buyer, "Only the buyer can dispute");
         job.status = State.DISPUTED;
         emit Disputed(jobId);
         // , job.buyer, job.seller, job.arbiter, job.amount);
@@ -569,8 +629,20 @@ contract Escrow is MetadataURI, Ownable {
         uint256 amount,
         string memory opinionURI,
         address arbiter,
-        string memory signature
+        bytes memory signature
     ) external {
+        require(
+            arbiter ==
+                checkSigner(
+                    string(
+                        abi.encodePacked(
+                            "This is my opinion on job with id: ",
+                            jobId
+                        )
+                    ),
+                    signature
+                )
+        );
         _arbitrate(jobId, amount, opinionURI, arbiter);
     }
 
@@ -583,26 +655,25 @@ contract Escrow is MetadataURI, Ownable {
         Job storage job = jobs[jobId];
         require(
             job.status == State.DISPUTED,
-            "Escrow: Job must be disputed to arbitrate"
+            "Job must be disputed to arbitrate"
         );
-        require(
-            job.arbiter == arbiter,
-            "Escrow: Only the arbiter can arbitrate"
-        );
+        require(job.arbiter == arbiter, "Only the arbiter can arbitrate");
         require(
             amount <= job.amount,
-            "Escrow: The amount cannot be greater than the job amount"
+            "The amount cannot be greater than the job amount"
         );
+        JobReview memory review;
+        review.arbiterOpinionUri = opinionURI;
+
         job.status = State.COMPLETE;
-        if (amount > 0)
-            USDC.transferFrom(address(this), job.seller, job.partialOffer);
-        if (amount < job.amount)
+        if (amount > 0) {
+            USDC.transferFrom(address(this), job.seller, amount);
+        }
+        if (amount < job.amount) {
             // need to understand this
-            USDC.transferFrom(
-                address(this),
-                job.seller,
-                job.amount - job.partialOffer
-            );
+            USDC.transferFrom(address(this), job.seller, job.amount - amount);
+        }
+
         emit Arbitrated(
             jobId
             // job.buyer,
@@ -626,8 +697,20 @@ contract Escrow is MetadataURI, Ownable {
         uint8 score,
         string memory reviewURI,
         address seller,
-        string memory signature
+        bytes memory signature
     ) external {
+        require(
+            seller ==
+                checkSigner(
+                    string(
+                        abi.encodePacked(
+                            "I am reviewing the buyer for job with id: ",
+                            jobId
+                        )
+                    ),
+                    signature
+                )
+        );
         _reviewBuyer(jobId, score, reviewURI, seller);
     }
 
@@ -639,15 +722,13 @@ contract Escrow is MetadataURI, Ownable {
         address seller
     ) internal {
         Job storage job = jobs[jobId];
-        require(
-            job.status == State.COMPLETE,
-            "Escrow: Job must complete to review"
-        );
-        require(
-            job.seller == seller,
-            "Escrow: Only the seller can review the buyer"
-        );
-        job.status = State.COMPLETE;
+        require(job.status == State.COMPLETE, "Job must complete to review");
+        require(job.seller == seller, "Only the seller can review the buyer");
+        require(score <= 5, "The score must be between 0 and 5");
+        JobReview memory review;
+        review.buyerScore = score;
+        review.buyerReviewUri = reviewURI;
+        jobReviews[jobId] = review;
         emit Reviewed(
             jobId
             // job.buyer,
@@ -671,8 +752,20 @@ contract Escrow is MetadataURI, Ownable {
         uint8 score,
         string memory reviewURI,
         address buyer,
-        string memory signature
+        bytes memory signature
     ) external {
+        require(
+            buyer ==
+                checkSigner(
+                    string(
+                        abi.encodePacked(
+                            "I am reviewing the seller for job with id: ",
+                            jobId
+                        )
+                    ),
+                    signature
+                )
+        );
         _reviewSeller(jobId, score, reviewURI, buyer);
     }
 
@@ -683,15 +776,13 @@ contract Escrow is MetadataURI, Ownable {
         address buyer
     ) internal {
         Job storage job = jobs[jobId];
-        require(
-            job.status == State.COMPLETE,
-            "Escrow: Job must complete to review"
-        );
-        require(
-            job.buyer == buyer,
-            "Escrow: Only the buyer can review the seller"
-        );
-        job.status = State.COMPLETE;
+        require(job.status == State.COMPLETE, "Job must complete to review");
+        require(job.buyer == buyer, "Only the buyer can review the seller");
+        JobReview memory review;
+        review.sellerScore = score;
+        review.sellerReviewUri = reviewURI;
+        jobReviews[jobId] = review;
+
         emit Reviewed(
             jobId
             // job.buyer,
@@ -715,8 +806,20 @@ contract Escrow is MetadataURI, Ownable {
         uint8 score,
         string memory reviewURI,
         address reviewer,
-        string memory signature
+        bytes memory signature
     ) external {
+        require(
+            reviewer ==
+                checkSigner(
+                    string(
+                        abi.encodePacked(
+                            "I am reviewing the arbiter for job with id: ",
+                            jobId
+                        )
+                    ),
+                    signature
+                )
+        );
         _reviewArbiter(jobId, score, reviewURI, reviewer);
     }
 
@@ -728,15 +831,25 @@ contract Escrow is MetadataURI, Ownable {
     ) internal {
         Job storage job = jobs[jobId];
         require(
-            job.status == State.COMPLETE &&
-                job.arbitrated = true,
-            "Escrow: Job must arbitrated to review"
+            job.status == State.COMPLETE && job.arbitrated == true,
+            "Job must arbitrated to review"
         );
         require(
             job.buyer == reviewer || job.seller == reviewer,
-            "Escrow: Only the buyer or seller can review the arbiter"
+            "Only the buyer or seller can review the arbiter"
         );
-        job.status = State.COMPLETE;
+
+        if (job.buyer == reviewer) {
+            JobReview memory review;
+            review.arbiterBuyerScore = score;
+            review.arbiterReviewByBuyerUri = reviewURI;
+            jobReviews[jobId] = review;
+        } else {
+            JobReview memory review;
+            review.arbiterSellerScore = score;
+            review.arbiterReviewBySellerUri = reviewURI;
+            jobReviews[jobId] = review;
+        }
         emit Reviewed(
             jobId
             // job.buyer,
