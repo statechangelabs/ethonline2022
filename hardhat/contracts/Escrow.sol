@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "hardhat/console.sol";
 import "@polydocs/contracts/contracts/interfaces/MetadataURI.sol";
 
 contract Escrow is MetadataURI, Ownable {
@@ -231,6 +232,39 @@ contract Escrow is MetadataURI, Ownable {
         return ECDSA.recover(hash, _signature);
     }
 
+    // function getJob(uint256 _jobId)
+    //     public
+    //     view
+    //     returns (
+    //         uint256,
+    //         address,
+    //         address,
+    //         address,
+    //         State,
+    //         bool,
+    //         bool,
+    //         bool,
+    //         uint256,
+    //         uint256,
+    //         uint256
+    //     )
+    // {
+    //     Job memory job = jobs[_jobId];
+    //     return (
+    //         job.amount,
+    //         job.buyer,
+    //         job.seller,
+    //         job.arbiter,
+    //         job.status,
+    //         job.buyerAccepted,
+    //         job.sellerAccepted,
+    //         job.arbitrated,
+    //         job.deliveryHeight,
+    //         job.dueHeight,
+    //         job.partialOffer
+    //     );
+    // }
+
     function bid(
         uint256 amount,
         address seller,
@@ -250,7 +284,7 @@ contract Escrow is MetadataURI, Ownable {
         // require()
         // string memory message = "I intend to bid for this job.";
         require(buyer == checkSigner("I am hiring for this job.", signature));
-        return _bid(amount, seller, arbiter, buyer);
+        _bid(amount, seller, arbiter, buyer);
     }
 
     // when buyer is initiating the job for a specific amount and for a specific seller
@@ -270,7 +304,7 @@ contract Escrow is MetadataURI, Ownable {
         newJob.buyerAccepted = true;
         newJob.sellerAccepted = false;
         jobs.push(newJob);
-        USDC.transferFrom(buyer, address(this), amount); // buyer needs to approve this contract to spend USDC
+        // USDC.transferFrom(buyer, address(this), amount); // buyer needs to approve this contract to spend USDC
         // require(condition, "Escrow: condition");
         emit BidCreated(
             _counter.current()
@@ -279,6 +313,7 @@ contract Escrow is MetadataURI, Ownable {
             // arbiter,
             // amount
         );
+        console.log(_counter.current());
         // return _counter.current();
     }
 
