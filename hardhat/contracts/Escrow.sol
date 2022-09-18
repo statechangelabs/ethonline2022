@@ -5,9 +5,10 @@ pragma solidity ^0.8.9;
 // import "hardhat/console.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "@polydocs/contracts/contracts/interfaces/MetadataURI.sol";
 
-contract Escrow is MetadataURI {
+contract Escrow is MetadataURI, Ownable {
     using Counters for Counters.Counter;
     // address public buyer;
     // address public seller;
@@ -109,6 +110,14 @@ contract Escrow is MetadataURI {
         // uint256 amount
     );
 
+    event Completed(
+        uint256 indexed jobID
+        // address buyer,
+        // address seller,
+        // address arbiter,
+        // uint256 amount
+    );
+
     Counters.Counter private _counter;
     enum State {
         AWAITING_ACCEPTANCE,
@@ -117,7 +126,7 @@ contract Escrow is MetadataURI {
         COMPLETE,
         REFUNDED,
         CANCELLED,
-        IN_DISPUTE,
+        DISPUTED,
         ARBITRATED
     }
 
@@ -130,6 +139,7 @@ contract Escrow is MetadataURI {
         State status;
         bool buyerAccepted;
         bool sellerAccepted;
+        bool arbitrated;
         uint256 deliveryHeight;
         uint256 dueHeight;
         string sellerReviewUri;
@@ -137,12 +147,15 @@ contract Escrow is MetadataURI {
         string arbiterReviewByBuyerUri;
         string arbiterReviewBySellerUri;
         string arbiterOpinionUri;
+        uint256 partialOffer;
+        address partialOfferer;
     }
 
     uint256 reviewBlocks = 1000;
 
     Job[] public jobs;
     IERC20 private USDC;
+    string private _uri;
 
     // State public currentState;
 
@@ -153,6 +166,40 @@ contract Escrow is MetadataURI {
         // arbiter = _arbiter;
         // amount = 0;
         // currentState = State.AWAITING_PAYMENT;
+    }
+
+    /// @notice This is the latest block height at which the terms were updated.
+    /// @dev This is the latest block height at which the terms were updated. 0 by default.
+    uint256 _lastTermChange = 0;
+
+    /// @notice Returns whether the address is allowed to accept terms on behalf of the signer.
+    /// @dev This function returns whether the address is allowed to accept terms on behalf of the signer.
+    mapping(address => bool) private _metaSigners;
+
+    /// @notice This modifier requires that the msg.sender is either the owner of the contract or an approved metasigner
+    modifier onlyMetaSigner() {
+        require(
+            _metaSigners[_msgSender()] || owner() == _msgSender(),
+            "Not a metasigner or Owner"
+        );
+        _;
+    }
+
+    /// @notice Function to set the contract URI
+    /// @dev This function lets the owner of the contract or a metasigner set the contract URI.
+    /// @dev It emits UpdatedURI event when URI is updated.
+    /// @param _newURI The URI to set.
+    function setURI(string memory _newURI) external onlyMetaSigner {
+        _uri = _newURI;
+        _lastTermChange = block.number;
+        emit UpdatedURI(_uri);
+    }
+
+    /// @notice Function to get the contract URI
+    /// @dev This function returns the contract URI.
+    /// @return _uri The contract URI.
+    function URI() public view returns (string memory) {
+        return _uri;
     }
 
     function bid(
@@ -193,11 +240,11 @@ contract Escrow is MetadataURI {
         USDC.transferFrom(buyer, address(this), amount); // USDC.transferFrom(buyer, address(this), amount); ??
         // require(condition, "Escrow: condition");
         emit BidCreated(
-            _counter.current(),
-            msg.sender,
-            seller,
-            arbiter,
-            amount
+            _counter.current()
+            // msg.sender,
+            // seller,
+            // arbiter,
+            // amount
         );
         // return _counter.current();
     }
@@ -223,7 +270,8 @@ contract Escrow is MetadataURI {
         job.sellerAccepted = true;
         require(job.buyerAccepted && job.sellerAccepted);
         job.status = State.AWAITING_DELIVERY;
-        emit BidAccepted(jobId, job.buyer, job.seller, job.arbiter, job.amount);
+        emit BidAccepted(jobId);
+        // , job.buyer, job.seller, job.arbiter, job.amount);
     }
 
     function offer(
@@ -262,11 +310,11 @@ contract Escrow is MetadataURI {
         jobs.push(newJob);
 
         emit OfferCreated(
-            _counter.current(),
-            buyer,
-            msg.sender,
-            arbiter,
-            amount
+            _counter.current()
+            // buyer,
+            // msg.sender,
+            // arbiter,
+            // amount
         );
     }
 
@@ -293,11 +341,11 @@ contract Escrow is MetadataURI {
         USDC.transferFrom(buyer, address(this), job.amount);
         job.status = State.AWAITING_DELIVERY;
         emit OfferAccepted(
-            jobId,
-            job.buyer,
-            job.seller,
-            job.arbiter,
-            job.amount
+            jobId
+            // job.buyer,
+            // job.seller,
+            // job.arbiter,
+            // job.amount
         );
     }
 
@@ -320,7 +368,8 @@ contract Escrow is MetadataURI {
             "Escrow: Only the seller can assert delivery"
         );
         job.status = State.AWAITING_RECEIPT;
-        emit Delivered(jobId, job.buyer, job.seller, job.arbiter, job.amount);
+        emit Delivered(jobId);
+        // , job.buyer, job.seller, job.arbiter, job.amount);
     }
 
     function receiveDelivery(uint256 jobId) external {
@@ -343,7 +392,8 @@ contract Escrow is MetadataURI {
         );
         job.status = State.COMPLETE;
         USDC.transferFrom(address(this), job.seller, job.amount);
-        emit Receipt(jobId, job.buyer, job.seller, job.arbiter, job.amount);
+        emit Receipt(jobId);
+        // , job.buyer, job.seller, job.arbiter, job.amount);
     }
 
     function cancel(uint256 jobId) external {
@@ -370,20 +420,20 @@ contract Escrow is MetadataURI {
                 job.status = State.REFUNDED;
                 // USDC.transfer(address(this), job.buyer, job.amount);
                 emit Refunded(
-                    jobId,
-                    job.buyer,
-                    job.seller,
-                    job.arbiter,
-                    job.amount
+                    jobId
+                    // job.buyer,
+                    // job.seller,
+                    // job.arbiter,
+                    // job.amount
                 );
             } else {
                 job.status = State.CANCELLED;
                 emit Cancelled(
-                    jobId,
-                    job.buyer,
-                    job.seller,
-                    job.arbiter,
-                    job.amount
+                    jobId
+                    // job.buyer,
+                    // job.seller,
+                    // job.arbiter,
+                    // job.amount
                 );
             }
         } else if (canceller == job.buyer) {
@@ -391,21 +441,21 @@ contract Escrow is MetadataURI {
                 if (job.buyerAccepted) {
                     job.status = State.CANCELLED;
                     emit Cancelled(
-                        jobId,
-                        job.buyer,
-                        job.seller,
-                        job.arbiter,
-                        job.amount
+                        jobId
+                        // job.buyer,
+                        // job.seller,
+                        // job.arbiter,
+                        // job.amount
                     );
                     // USDC.transfer(address(this), job.buyer, job.amount);
                 } else {
                     job.status = State.CANCELLED;
                     emit Cancelled(
-                        jobId,
-                        job.buyer,
-                        job.seller,
-                        job.arbiter,
-                        job.amount
+                        jobId
+                        // job.buyer,
+                        // job.seller,
+                        // job.arbiter,
+                        // job.amount
                     );
                 }
             } else {
@@ -432,7 +482,7 @@ contract Escrow is MetadataURI {
         address offerer,
         string memory signature
     ) external {
-        _partialCompletion(jobId, amount);
+        _partialCompletion(jobId, amount, offerer);
     }
 
     function _partialCompletion(
@@ -462,24 +512,27 @@ contract Escrow is MetadataURI {
             //settle it
             job.status = State.COMPLETE;
             emit Completed(
-                jobId,
-                job.buyer,
-                job.seller,
-                job.arbiter,
-                job.amount
+                jobId
+                // job.buyer,
+                // job.seller,
+                // job.arbiter,
+                // job.amount
             );
             if (job.partialOffer > 0 && job.partialOffer <= job.amount)
                 USDC.transferFrom(address(this), job.seller, job.partialOffer);
             if (job.partialOffer < job.amount)
+                // need to understand this
                 USDC.transferFrom(
-                    address(this).job.seller,
+                    address(this),
+                    job.seller,
                     job.amount - job.partialOffer
                 );
             job.partialOffer = amount;
         } else {
             job.partialOffer = amount;
             job.partialOfferer = offerer;
-            emit PartialOffered(jobId, offerer, amount);
+            emit PartialOffered(jobId);
+            // , offerer, amount);
         }
     }
 
@@ -499,13 +552,14 @@ contract Escrow is MetadataURI {
         Job storage job = jobs[jobId];
         require(disputor == job.buyer, "Escrow: Only the buyer can dispute");
         job.status = State.DISPUTED;
-        emit Disputed(jobId, job.buyer, job.seller, job.arbiter, job.amount);
+        emit Disputed(jobId);
+        // , job.buyer, job.seller, job.arbiter, job.amount);
     }
 
     function arbitrate(
         uint256 jobId,
         uint256 amount,
-        string opinionURI
+        string memory opinionURI
     ) external {
         _arbitrate(jobId, amount, opinionURI, msg.sender);
     }
@@ -513,7 +567,7 @@ contract Escrow is MetadataURI {
     function arbitrateFor(
         uint256 jobId,
         uint256 amount,
-        string opinionURI,
+        string memory opinionURI,
         address arbiter,
         string memory signature
     ) external {
@@ -523,7 +577,7 @@ contract Escrow is MetadataURI {
     function _arbitrate(
         uint256 jobId,
         uint256 amount,
-        string opinionURI,
+        string memory opinionURI,
         address arbiter
     ) internal {
         Job storage job = jobs[jobId];
@@ -543,32 +597,46 @@ contract Escrow is MetadataURI {
         if (amount > 0)
             USDC.transferFrom(address(this), job.seller, job.partialOffer);
         if (amount < job.amount)
+            // need to understand this
             USDC.transferFrom(
-                address(this).job.seller,
+                address(this),
+                job.seller,
                 job.amount - job.partialOffer
             );
         emit Arbitrated(
-            jobId,
-            job.buyer,
-            job.seller,
-            job.arbiter,
-            job.amount,
-            opinionURI
+            jobId
+            // job.buyer,
+            // job.seller,
+            // job.arbiter,
+            // job.amount,
+            // opinionURI
         );
     }
 
     function reviewBuyer(
         uint256 jobId,
-        uint256 score,
-        string reviewURI
+        uint8 score,
+        string memory reviewURI
     ) external {
-        _reviewBuyer(jobId, rating, reviewURI);
+        _reviewBuyer(jobId, score, reviewURI, msg.sender);
     }
 
+    function reviewBuyerFor(
+        uint256 jobId,
+        uint8 score,
+        string memory reviewURI,
+        address seller,
+        string memory signature
+    ) external {
+        _reviewBuyer(jobId, score, reviewURI, seller);
+    }
+
+    // Multiple reviews are allowed at the moment. maybe we should limit it to one review per job?
     function _reviewBuyer(
         uint256 jobId,
         uint8 score,
-        string reviewURI
+        string memory reviewURI,
+        address seller
     ) internal {
         Job storage job = jobs[jobId];
         require(
@@ -576,32 +644,43 @@ contract Escrow is MetadataURI {
             "Escrow: Job must complete to review"
         );
         require(
-            job.seller == msg.sender,
+            job.seller == seller,
             "Escrow: Only the seller can review the buyer"
         );
         job.status = State.COMPLETE;
         emit Reviewed(
-            jobId,
-            job.buyer,
-            job.seller,
-            job.arbiter,
-            job.amount,
-            opinionURI
+            jobId
+            // job.buyer,
+            // job.seller,
+            // job.arbiter,
+            // job.amount,
+            // reviewURI
         );
     }
 
     function reviewSeller(
         uint256 jobId,
-        uint256 score,
-        string reviewURI
+        uint8 score,
+        string memory reviewURI
     ) external {
-        _reviewSeller(jobId, rating, reviewURI);
+        _reviewSeller(jobId, score, reviewURI, msg.sender);
+    }
+
+    function reviewSellerFor(
+        uint256 jobId,
+        uint8 score,
+        string memory reviewURI,
+        address buyer,
+        string memory signature
+    ) external {
+        _reviewSeller(jobId, score, reviewURI, buyer);
     }
 
     function _reviewSeller(
         uint256 jobId,
         uint8 score,
-        string reviewURI
+        string memory reviewURI,
+        address buyer
     ) internal {
         Job storage job = jobs[jobId];
         require(
@@ -609,32 +688,43 @@ contract Escrow is MetadataURI {
             "Escrow: Job must complete to review"
         );
         require(
-            job.buyer == msg.sender,
+            job.buyer == buyer,
             "Escrow: Only the buyer can review the seller"
         );
         job.status = State.COMPLETE;
         emit Reviewed(
-            jobId,
-            job.buyer,
-            job.seller,
-            job.arbiter,
-            job.amount,
-            opinionURI
+            jobId
+            // job.buyer,
+            // job.seller,
+            // job.arbiter,
+            // job.amount,
+            // reviewURI
         );
     }
 
     function reviewArbiter(
         uint256 jobId,
-        uint256 score,
-        string reviewURI
+        uint8 score,
+        string memory reviewURI
     ) external {
-        _reviewArbiter(jobId, rating, reviewURI);
+        _reviewArbiter(jobId, score, reviewURI, msg.sender);
+    }
+
+    function reviewArbiterFor(
+        uint256 jobId,
+        uint8 score,
+        string memory reviewURI,
+        address reviewer,
+        string memory signature
+    ) external {
+        _reviewArbiter(jobId, score, reviewURI, reviewer);
     }
 
     function _reviewArbiter(
         uint256 jobId,
         uint8 score,
-        string reviewURI
+        string memory reviewURI,
+        address reviewer
     ) internal {
         Job storage job = jobs[jobId];
         require(
@@ -643,17 +733,17 @@ contract Escrow is MetadataURI {
             "Escrow: Job must arbitrated to review"
         );
         require(
-            job.buyer == msg.sender || job.seller == msg.sender,
+            job.buyer == reviewer || job.seller == reviewer,
             "Escrow: Only the buyer or seller can review the arbiter"
         );
         job.status = State.COMPLETE;
         emit Reviewed(
-            jobId,
-            job.buyer,
-            job.seller,
-            job.arbiter,
-            job.amount,
-            opinionURI
+            jobId
+            // job.buyer,
+            // job.seller,
+            // job.arbiter,
+            // job.amount,
+            // reviewURI
         );
     }
 
