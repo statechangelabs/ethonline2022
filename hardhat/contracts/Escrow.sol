@@ -15,66 +15,98 @@ contract Escrow is MetadataURI {
     // uint public amount;
     // Counters private _counter;
     event BidCreated(
-        uint256 indexed jobID,
-        address buyer,
-        address seller,
-        address arbiter,
-        uint256 amount
+        uint256 indexed jobID
+        // address buyer,
+        // address seller,
+        // address arbiter,
+        // uint256 amount
     );
     event OfferCreated(
-        uint256 indexed jobID,
-        address buyer,
-        address seller,
-        address arbiter,
-        uint256 amount
+        uint256 indexed jobID
+        // address buyer,
+        // address seller,
+        // address arbiter,
+        // uint256 amount
     );
 
     event BidAccepted(
-        uint256 indexed jobID,
-        address buyer,
-        address seller,
-        address arbiter,
-        uint256 amount
+        uint256 indexed jobID
+        // address buyer,
+        // address seller,
+        // address arbiter,
+        // uint256 amount
     );
 
     event OfferAccepted(
-        uint256 indexed jobID,
-        address buyer,
-        address seller,
-        address arbiter,
-        uint256 amount
+        uint256 indexed jobID
+        // address buyer,
+        // address seller,
+        // address arbiter,
+        // uint256 amount
     );
 
     event Delivered(
-        uint256 indexed jobID,
-        address buyer,
-        address seller,
-        address arbiter,
-        uint256 amount
+        uint256 indexed jobID
+        // address buyer,
+        // address seller,
+        // address arbiter,
+        // uint256 amount
     );
 
     event Receipt(
-        uint256 indexed jobID,
-        address buyer,
-        address seller,
-        address arbiter,
-        uint256 amount
+        uint256 indexed jobID
+        // address buyer,
+        // address seller,
+        // address arbiter,
+        // uint256 amount
     );
 
     event Refunded(
-        uint256 indexed jobID,
-        address buyer,
-        address seller,
-        address arbiter,
-        uint256 amount
+        uint256 indexed jobID
+        // address buyer,
+        // address seller,
+        // address arbiter,
+        // uint256 amount
     );
 
     event Cancelled(
-        uint256 indexed jobID,
-        address buyer,
-        address seller,
-        address arbiter,
-        uint256 amount
+        uint256 indexed jobID
+        // address buyer,
+        // address seller,
+        // address arbiter,
+        // uint256 amount
+    );
+
+    event PartialOffered(
+        uint256 indexed jobID
+        // address buyer,
+        // address seller,
+        // address arbiter,
+        // uint256 amount
+    );
+
+    event Disputed(
+        uint256 indexed jobID
+        // address buyer,
+        // address seller,
+        // address arbiter,
+        // uint256 amount
+    );
+
+    event Arbitrated(
+        uint256 indexed jobID
+        // address buyer,
+        // address seller,
+        // address arbiter,
+        // uint256 amount
+    );
+
+    event Reviewed(
+        uint256 indexed jobID
+        // address buyer,
+        // address seller,
+        // address arbiter,
+        // uint256 amount
     );
 
     Counters.Counter private _counter;
