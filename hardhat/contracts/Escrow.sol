@@ -155,12 +155,20 @@ contract Escrow is MetadataURI {
         // currentState = State.AWAITING_PAYMENT;
     }
 
-    // when buyer is initiating the job for a specific amount and for a specific seller
     function bid(
         uint256 amount,
         address seller,
         address arbiter
-    ) public {
+    ) external {
+        _bid(amount, seller, arbiter);
+    }
+
+    // when buyer is initiating the job for a specific amount and for a specific seller
+    function _bid(
+        uint256 amount,
+        address seller,
+        address arbiter
+    ) internal {
         Job memory newJob;
         _counter.increment();
         newJob.amount = amount;
@@ -183,7 +191,11 @@ contract Escrow is MetadataURI {
         // return _counter.current();
     }
 
-    function acceptBid(uint256 jobId) public {
+    function acceptBid(uint256 jobID) external {
+        _acceptBid(jobID);
+    }
+
+    function _acceptBid(uint256 jobId) internal {
         Job storage job = jobs[jobId];
         require(
             msg.sender == job.seller,
@@ -199,7 +211,15 @@ contract Escrow is MetadataURI {
         uint256 amount,
         address buyer,
         address arbiter
-    ) public {
+    ) external {
+        _offer(amount, buyer, arbiter);
+    }
+
+    function _offer(
+        uint256 amount,
+        address buyer,
+        address arbiter
+    ) internal {
         Job memory newJob;
         _counter.increment();
         newJob.amount = amount;
@@ -251,7 +271,11 @@ contract Escrow is MetadataURI {
         );
     }
 
-    function assertDelivery(uint256 jobId) public {
+    function assertDelivery(uint256 jobId) external {
+        _assertDelivery(jobId);
+    }
+
+    function _assertDelivery(uint256 jobId) internal {
         Job storage job = jobs[jobId];
         require(
             msg.sender == job.seller,
@@ -261,7 +285,11 @@ contract Escrow is MetadataURI {
         emit Delivered(jobId, job.buyer, job.seller, job.arbiter, job.amount);
     }
 
-    function receiveDelivery(uint256 jobId) public {
+    function receiveDelivery(uint256 jobId) external {
+        _receiveDelivery(jobId);
+    }
+
+    function _receiveDelivery(uint256 jobId) internal {
         Job storage job = jobs[jobId];
         require(
             msg.sender == job.buyer,
@@ -272,7 +300,11 @@ contract Escrow is MetadataURI {
         emit Receipt(jobId, job.buyer, job.seller, job.arbiter, job.amount);
     }
 
-    function cancel(uint256 jobId) public {
+    function cancel(uint256 jobId) external {
+        _cancel(jobId);
+    }
+
+    function _cancel(uint256 jobId) internal {
         Job storage job = jobs[jobId];
         if (msg.sender == job.seller) {
             require(
@@ -336,7 +368,11 @@ contract Escrow is MetadataURI {
         }
     }
 
-    function partialCompletion(uint256 jobId, uint256 amount) public {
+    function partialCompletion(uint256 jobId, uint256 amount) external {
+        _partialCompletion(jobId, amount);
+    }
+
+    function _partialCompletion(uint256 jobId, uint256 amount) internal {
         Job storage job = jobs[jobId];
         require(
             msg.sender == job.seller || msg.sender == job.buyer,
@@ -380,7 +416,11 @@ contract Escrow is MetadataURI {
         }
     }
 
-    function dispute(uint256 jobId) public {
+    function dispute(uint256 jobId) external {
+        _dispute(jobId);
+    }
+
+    function _dispute(uint256 jobId) internal {
         Job storage job = jobs[jobId];
         require(msg.sender == job.buyer, "Escrow: Only the buyer can dispute");
         job.status = State.DISPUTED;
@@ -391,7 +431,15 @@ contract Escrow is MetadataURI {
         uint256 jobId,
         uint256 amount,
         string opinionURI
-    ) {
+    ) external {
+        _arbitrate(jobId, amount, opinionURI);
+    }
+
+    function _arbitrate(
+        uint256 jobId,
+        uint256 amount,
+        string opinionURI
+    ) internal {
         Job storage job = jobs[jobId];
         require(
             job.status == State.DISPUTED,
@@ -425,9 +473,17 @@ contract Escrow is MetadataURI {
 
     function reviewBuyer(
         uint256 jobId,
+        uint256 score,
+        string reviewURI
+    ) external {
+        _reviewBuyer(jobId, rating, reviewURI);
+    }
+
+    function _reviewBuyer(
+        uint256 jobId,
         uint8 score,
         string reviewURI
-    ) public {
+    ) internal {
         Job storage job = jobs[jobId];
         require(
             job.status == State.COMPLETE,
@@ -450,9 +506,17 @@ contract Escrow is MetadataURI {
 
     function reviewSeller(
         uint256 jobId,
+        uint256 score,
+        string reviewURI
+    ) external {
+        _reviewSeller(jobId, rating, reviewURI);
+    }
+
+    function _reviewSeller(
+        uint256 jobId,
         uint8 score,
         string reviewURI
-    ) public {
+    ) internal {
         Job storage job = jobs[jobId];
         require(
             job.status == State.COMPLETE,
@@ -475,9 +539,17 @@ contract Escrow is MetadataURI {
 
     function reviewArbiter(
         uint256 jobId,
+        uint256 score,
+        string reviewURI
+    ) external {
+        _reviewArbiter(jobId, rating, reviewURI);
+    }
+
+    function _reviewArbiter(
+        uint256 jobId,
         uint8 score,
         string reviewURI
-    ) public {
+    ) internal {
         Job storage job = jobs[jobId];
         require(
             job.status == State.COMPLETE &&
