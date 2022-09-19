@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.9;
+pragma solidity ^0.8.17;
 
 // Uncomment this line to use console.log
 // import "hardhat/console.sol";
@@ -18,90 +18,65 @@ contract Escrow is MetadataURI, Ownable {
     // uint public amount;
     // Counters private _counter;
     event BidCreated(
-        uint256 indexed jobID
-        // address buyer,
-        // address seller,
-        // address arbiter,
-        // uint256 amount
+        uint256 indexed jobID,
+        address indexed buyer,
+        address indexed seller
     );
     event OfferCreated(
-        uint256 indexed jobID
-        // address buyer,
-        // address seller,
-        // address arbiter,
-        // uint256 amount
+        uint256 indexed jobID,
+        address indexed buyer,
+        address indexed seller
     );
 
     event BidAccepted(
-        uint256 indexed jobID
-        // address buyer,
-        // address seller,
-        // address arbiter,
-        // uint256 amount
+        uint256 indexed jobID,
+        address indexed buyer,
+        address indexed seller
     );
 
     event OfferAccepted(
-        uint256 indexed jobID
-        // address buyer,
-        // address seller,
-        // address arbiter,
-        // uint256 amount
+        uint256 indexed jobID,
+        address indexed buyer,
+        address indexed seller
     );
 
     event Delivered(
-        uint256 indexed jobID
-        // address buyer,
-        // address seller,
-        // address arbiter,
-        // uint256 amount
+        uint256 indexed jobID,
+        address indexed buyer
     );
 
     event Receipt(
-        uint256 indexed jobID
-        // address buyer,
-        // address seller,
-        // address arbiter,
-        // uint256 amount
+        uint256 indexed jobID,
+        address indexed seller
     );
 
     event Refunded(
-        uint256 indexed jobID
-        // address buyer,
-        // address seller,
-        // address arbiter,
-        // uint256 amount
+        uint256 indexed jobID,
+        address indexed buyer,
     );
 
     event Cancelled(
-        uint256 indexed jobID
-        // address buyer,
-        // address seller,
-        // address arbiter,
-        // uint256 amount
+        uint256 indexed jobID,
+        address indexed buyer,
+        address indexed seller,
     );
 
     event PartialOffered(
         uint256 indexed jobID
-        // address buyer,
-        // address seller,
-        // address arbiter,
-        // uint256 amount
+        address indexed buyer,
+        address indexed seller,
+        uint256 amount
     );
 
     event Disputed(
-        uint256 indexed jobID
-        // address buyer,
-        // address seller,
-        // address arbiter,
-        // uint256 amount
+        uint256 indexed jobID,
+        address indexed seller
     );
 
     event Arbitrated(
         uint256 indexed jobID
-        // address buyer,
-        // address seller,
-        // address arbiter,
-        // uint256 amount
+        address indexed buyer,
+        address indexed seller,
     );
 
     event Reviewed(
