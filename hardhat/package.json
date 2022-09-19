@@ -24,6 +24,9 @@
   },
   "dependencies": {
     "@openzeppelin/contracts": "^4.7.3",
-    "@polydocs/contracts": "^1.0.1"
+    "@polydocs/contracts": "^1.0.1",
+    "dotenv": "^16.0.2",
+    "hardhat-tracer": "^1.1.0-rc.9",
+    "solidity-docgen": "^0.6.0-beta.26"
   }
 }
