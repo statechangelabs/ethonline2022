@@ -40,43 +40,31 @@ contract Escrow is MetadataURI, Ownable {
         address indexed seller
     );
 
-    event Delivered(
-        uint256 indexed jobID,
-        address indexed buyer
-    );
+    event Delivered(uint256 indexed jobID, address indexed buyer);
 
-    event Receipt(
-        uint256 indexed jobID,
-        address indexed seller
-    );
+    event Receipt(uint256 indexed jobID, address indexed seller);
 
-    event Refunded(
-        uint256 indexed jobID,
-        address indexed buyer,
-    );
+    event Refunded(uint256 indexed jobID, address indexed buyer);
 
     event Cancelled(
         uint256 indexed jobID,
         address indexed buyer,
-        address indexed seller,
+        address indexed seller
     );
 
     event PartialOffered(
-        uint256 indexed jobID
+        uint256 indexed jobID,
         address indexed buyer,
         address indexed seller,
         uint256 amount
     );
 
-    event Disputed(
-        uint256 indexed jobID,
-        address indexed seller
-    );
+    event Disputed(uint256 indexed jobID, address indexed seller);
 
     event Arbitrated(
-        uint256 indexed jobID
+        uint256 indexed jobID,
         address indexed buyer,
-        address indexed seller,
+        address indexed seller
     );
 
     event Reviewed(
