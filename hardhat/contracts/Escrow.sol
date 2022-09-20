@@ -14,11 +14,7 @@ import "@polydocs/contracts/contracts/interfaces/MetadataURI.sol";
 
 contract Escrow is Ownable {
     using Counters for Counters.Counter;
-    // address public buyer;
-    // address public seller;
-    // address public arbiter;
-    // uint public amount;
-    // Counters private _counter;
+
     event BidCreated(
         uint256 indexed jobID,
         address indexed buyer,
@@ -69,13 +65,7 @@ contract Escrow is Ownable {
         address indexed seller
     );
 
-    event Completed(
-        uint256 indexed jobID
-        // address buyer,
-        // address seller,
-        // address arbiter,
-        // uint256 amount
-    );
+    event Completed(uint256 indexed jobID);
 
     Counters.Counter private _counter;
     enum State {
@@ -90,7 +80,6 @@ contract Escrow is Ownable {
     }
 
     struct Job {
-        // uint jobId;
         uint256 amount;
         address buyer;
         address seller;
@@ -101,37 +90,10 @@ contract Escrow is Ownable {
         bool arbitrated;
         uint256 deliveryHeight;
         uint256 dueHeight;
-        // uint8 buyerScore;
-        // uint8 sellerScore;
-        // uint8 arbiterBuyerScore;
-        // uint8 arbiterSellerScore;
-        // string sellerReviewUri;
-        // string buyerReviewUri;
-        // string arbiterReviewByBuyerUri;
-        // string arbiterReviewBySellerUri;
-        // string arbiterOpinionUri;
         uint256 partialOffer;
         address partialOfferer;
-        // string arbiterOpinionUri;
     }
 
-    // struct JobReview {
-    //     uint8 buyerScore;
-    //     uint8 sellerScore;
-    //     uint8 arbiterBuyerScore;
-    //     uint8 arbiterSellerScore;
-    //     string sellerReviewUri;
-    //     string buyerReviewUri;
-    //     string arbiterReviewByBuyerUri;
-    //     string arbiterReviewBySellerUri;
-    //     string arbiterOpinionUri;
-    // }
-
-    // mapping(uint256 => JobReview) public jobReviews;
-    // mapping(uint256 => string) public buyerReviewUris;
-    // mapping(uint256 => string) public sellerReviewUris;
-    // mapping(uint256 => string) public arbiterReviewByBuyerUris;
-    // mapping(uint256 => string) public arbiterReviewBySellerUris;
     mapping(uint256 => string) public arbiterOpinionUris;
 
     uint256 reviewBlocks = 1000;
@@ -144,11 +106,6 @@ contract Escrow is Ownable {
 
     constructor() {
         USDC = IERC20(0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174);
-        // buyer = _buyer;
-        // seller = _seller;
-        // arbiter = _arbiter;
-        // amount = 0;
-        // currentState = State.AWAITING_PAYMENT;
     }
 
     /// @notice This is the latest block height at which the terms were updated.
@@ -208,10 +165,8 @@ contract Escrow is Ownable {
         address seller,
         address arbiter,
         address buyer,
-        // string memory message,
         bytes memory signature
     ) external {
-        // require()
         // string memory message = "I intend to bid for this job.";
         require(buyer == checkSigner("I am hiring for this job.", signature));
         _bid(amount, seller, arbiter, buyer);
@@ -234,19 +189,8 @@ contract Escrow is Ownable {
         newJob.sellerAccepted = false;
         jobs.push(newJob);
         // USDC.transferFrom(buyer, address(this), amount); // buyer needs to approve this contract to spend USDC
-        // require(condition, "Escrow: condition");
-        emit BidCreated(
-            _counter.current(),
-            newJob.buyer,
-            newJob.seller
-            // msg.sender,
-            // seller,
-            // arbiter,
-            // amount
-        );
+        emit BidCreated(_counter.current(), newJob.buyer, newJob.seller);
         _counter.increment();
-        // console.log(_counter.current());
-        // return _counter.current();
     }
 
     function acceptBid(uint256 jobID) external {
@@ -269,7 +213,6 @@ contract Escrow is Ownable {
         require(job.buyerAccepted && job.sellerAccepted);
         job.status = State.AWAITING_DELIVERY;
         emit BidAccepted(jobId, job.buyer, job.seller);
-        // , job.buyer, job.seller, job.arbiter, job.amount);
     }
 
     function offer(
@@ -308,23 +251,15 @@ contract Escrow is Ownable {
         newJob.sellerAccepted = true;
         jobs.push(newJob);
 
-        emit OfferCreated(
-            _counter.current(),
-            newJob.buyer,
-            newJob.seller
-            // buyer,
-            // msg.sender,
-            // arbiter,
-            // amount
-        );
+        emit OfferCreated(_counter.current(), newJob.buyer, newJob.seller);
         _counter.increment();
     }
 
-    function offerAccepted(uint256 jobId) external {
-        _offerAccepted(jobId, msg.sender);
+    function acceptOffer(uint256 jobId) external {
+        _acceptOffer(jobId, msg.sender);
     }
 
-    function offerAcceptedFor(
+    function acceptOfferFor(
         uint256 jobId,
         address buyer,
         bytes memory signature
@@ -333,23 +268,17 @@ contract Escrow is Ownable {
             buyer ==
                 checkSigner("I am accepting the offer for this job.", signature)
         );
-        _offerAccepted(jobId, buyer);
+        _acceptOffer(jobId, buyer);
     }
 
-    function _offerAccepted(uint256 jobId, address buyer) internal {
+    function _acceptOffer(uint256 jobId, address buyer) internal {
         Job storage job = jobs[jobId];
         require(buyer == job.buyer);
         job.buyerAccepted = true;
         require(job.buyerAccepted && job.sellerAccepted);
-        USDC.transferFrom(buyer, address(this), job.amount);
+        // USDC.transferFrom(buyer, address(this), job.amount);
         job.status = State.AWAITING_DELIVERY;
-        emit OfferAccepted(
-            jobId,
-            job.buyer,
-            job.seller
-            // job.arbiter,
-            // job.amount
-        );
+        emit OfferAccepted(jobId, job.buyer, job.seller);
     }
 
     function assertDelivery(uint256 jobId) external {
@@ -373,7 +302,6 @@ contract Escrow is Ownable {
         require(seller == job.seller);
         job.status = State.AWAITING_RECEIPT;
         emit Delivered(jobId, job.buyer);
-        // , job.buyer, job.seller, job.arbiter, job.amount);
     }
 
     function receiveDelivery(uint256 jobId) external {
@@ -396,9 +324,8 @@ contract Escrow is Ownable {
         Job storage job = jobs[jobId];
         require(buyer == job.buyer);
         job.status = State.COMPLETE;
-        USDC.transferFrom(address(this), job.seller, job.amount);
+        // USDC.transferFrom(address(this), job.seller, job.amount);
         emit Receipt(jobId, job.seller);
-        // , job.buyer, job.seller, job.arbiter, job.amount);
     }
 
     function cancel(uint256 jobId) external {
@@ -427,44 +354,20 @@ contract Escrow is Ownable {
             if (job.buyerAccepted) {
                 job.status = State.REFUNDED;
                 // USDC.transfer(address(this), job.buyer, job.amount);
-                emit Refunded(
-                    jobId,
-                    job.buyer
-                    // job.seller,
-                    // job.arbiter,
-                    // job.amount
-                );
+                emit Refunded(jobId, job.buyer);
             } else {
                 job.status = State.CANCELLED;
-                emit Cancelled(
-                    jobId,
-                    job.buyer,
-                    job.seller
-                    // job.arbiter,
-                    // job.amount
-                );
+                emit Cancelled(jobId, job.buyer, job.seller);
             }
         } else if (canceller == job.buyer) {
             if (job.status == State.AWAITING_ACCEPTANCE) {
                 if (job.buyerAccepted) {
                     job.status = State.CANCELLED;
-                    emit Cancelled(
-                        jobId,
-                        job.buyer,
-                        job.seller
-                        // job.arbiter,
-                        // job.amount
-                    );
+                    emit Cancelled(jobId, job.buyer, job.seller);
                     // USDC.transfer(address(this), job.buyer, job.amount);
                 } else {
                     job.status = State.CANCELLED;
-                    emit Cancelled(
-                        jobId,
-                        job.buyer,
-                        job.seller
-                        // job.arbiter,
-                        // job.amount
-                    );
+                    emit Cancelled(jobId, job.buyer, job.seller);
                 }
             } else {
                 // Buyer cannot cancel the job in progress
@@ -522,13 +425,7 @@ contract Escrow is Ownable {
             );
             //settle it
             job.status = State.COMPLETE;
-            emit Completed(
-                jobId
-                // job.buyer,
-                // job.seller,
-                // job.arbiter,
-                // job.amount
-            );
+            emit Completed(jobId);
             if (job.partialOffer > 0 && job.partialOffer <= job.amount)
                 USDC.transferFrom(address(this), job.seller, job.partialOffer);
             if (job.partialOffer < job.amount)
@@ -543,7 +440,6 @@ contract Escrow is Ownable {
             job.partialOffer = amount;
             job.partialOfferer = offerer;
             emit PartialOffered(jobId, job.buyer, job.seller, job.partialOffer);
-            // , offerer, amount);
         }
     }
 
@@ -576,7 +472,6 @@ contract Escrow is Ownable {
         require(disputor == job.buyer, "Only the buyer can dispute");
         job.status = State.DISPUTED;
         emit Disputed(jobId, job.seller);
-        // , job.buyer, job.seller, job.arbiter, job.amount);
     }
 
     function arbitrate(
@@ -634,13 +529,6 @@ contract Escrow is Ownable {
             USDC.transferFrom(address(this), job.seller, job.amount - amount);
         }
 
-        emit Arbitrated(
-            jobId,
-            job.buyer,
-            job.seller
-            // job.arbiter,
-            // job.amount,
-            // opinionURI
-        );
+        emit Arbitrated(jobId, job.buyer, job.seller);
     }
 }
