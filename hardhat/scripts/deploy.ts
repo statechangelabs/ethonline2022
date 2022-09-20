@@ -22,6 +22,11 @@ async function main() {
   const jobId_1 = parseInt(jobBid_receipt.logs[0].topics[1],16)
   console.log("Job bid created");
 
+  // Accept the job bid from the seller
+  console.log("Accepting the job bid from the seller");
+  const bidAccept = await escrow.connect(seller).acceptBid(jobId_1);
+  const bidAccept_receipt = await bidAccept.wait();
+
 
   // const jobBid_2 = await escrow.connect(buyer).bid(ethers.utils.parseUnits("1", "ether"), seller.address, arbiter.address);
   // const jobBid_receipt_2 = await jobBid_2.wait();
