@@ -105,7 +105,7 @@ contract Escrow is Ownable {
     // State public currentState;
 
     constructor() {
-        USDC = IERC20(0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174);
+        USDC = IERC20(0xe11A86849d99F524cAC3E7A0Ec1241828e332C62);
     }
 
     /// @notice This is the latest block height at which the terms were updated.
@@ -188,6 +188,11 @@ contract Escrow is Ownable {
         newJob.buyerAccepted = true;
         newJob.sellerAccepted = false;
         jobs.push(newJob);
+        console.log("Buyer balance");
+        console.log(USDC.balanceOf(buyer));
+        console.log(amount);
+        // USDC.allowance(address, amount);
+        // USDC.approve(address(this), amount);
         USDC.transferFrom(buyer, address(this), amount); // buyer needs to approve this contract to spend USDC
         emit BidCreated(_counter.current(), newJob.buyer, newJob.seller);
         _counter.increment();
