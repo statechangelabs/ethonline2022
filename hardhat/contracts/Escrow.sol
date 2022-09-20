@@ -426,16 +426,18 @@ contract Escrow is Ownable {
             //settle it
             job.status = State.COMPLETE;
             emit Completed(jobId);
-            if (job.partialOffer > 0 && job.partialOffer <= job.amount)
+            if (job.partialOffer > 0 && job.partialOffer <= job.amount) {
                 USDC.transferFrom(address(this), job.seller, job.partialOffer);
-            if (job.partialOffer < job.amount)
+            }
+            if (job.partialOffer < job.amount) {
                 // need to understand this
                 USDC.transferFrom(
                     address(this),
                     job.seller,
                     job.amount - job.partialOffer
                 );
-            job.partialOffer = amount;
+                job.partialOffer = amount;
+            }
         } else {
             job.partialOffer = amount;
             job.partialOfferer = offerer;
@@ -470,6 +472,11 @@ contract Escrow is Ownable {
     function _dispute(uint256 jobId, address disputor) internal {
         Job storage job = jobs[jobId];
         require(disputor == job.buyer, "Only the buyer can dispute");
+        require(
+            job.status == State.AWAITING_DELIVERY || // can the buyer dispute before the seller delivers?
+                job.status == State.AWAITING_RECEIPT,
+            "Job must be in progress"
+        );
         job.status = State.DISPUTED;
         emit Disputed(jobId, job.seller);
     }
@@ -522,11 +529,11 @@ contract Escrow is Ownable {
 
         job.status = State.COMPLETE;
         if (amount > 0) {
-            USDC.transferFrom(address(this), job.seller, amount);
+            // USDC.transferFrom(address(this), job.seller, amount);
         }
         if (amount < job.amount) {
             // need to understand this
-            USDC.transferFrom(address(this), job.seller, job.amount - amount);
+            // USDC.transferFrom(address(this), job.seller, job.amount - amount);
         }
 
         emit Arbitrated(jobId, job.buyer, job.seller);

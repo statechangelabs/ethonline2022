@@ -102,7 +102,36 @@ async function main() {
   console.log("Job cancelled by buyer");
 
   console.log("\n-------------------\n");
-  // Happy Path 5: Buyer creates a job, deposits funds, seller accepts but cancels the job later
+  // Happy Path 5: Buyer creates a job, deposits funds, seller accepts and delivers but buyer disputes the job and arbiter rules in favour of seller.
+  console.log("Happy Path 5: Buyer creates a job, deposits funds, seller accepts and delivers but buyer disputes the job");
+  console.log("Creating a new job bid from the buyer");
+  const jobBid_4 = await escrow.connect(buyer).bid(ethers.utils.parseUnits("1", "ether"), seller.address, arbiter.address);
+  const jobBid_receipt_4 = await jobBid_4.wait();
+  const jobId_5 = parseInt(jobBid_receipt_4.logs[0].topics[1],16)
+  console.log("Job bid created");
+
+  console.log("Accepting the job bid from the seller");
+  const bidAccept_3 = await escrow.connect(seller).acceptBid(jobId_5);
+  const bidAccept_receipt_3 = await bidAccept_3.wait();
+  console.log("Job bid accepted");
+
+  console.log("Seller asserts that the job is delivered.");
+  const jobDelivered_3 = await escrow.connect(seller).assertDelivery(jobId_5);
+  const jobDelivered_receipt_3 = await jobDelivered_3.wait();
+  console.log("Job delivered");
+
+  console.log("Buyer disputes the job delivery.");
+  const jobDisputed = await escrow.connect(buyer).dispute(jobId_5);
+  const jobDisputed_receipt = await jobDisputed.wait();
+  console.log("Job disputed by buyer");
+
+  console.log("Arbiter ruling in favour of the seller.");
+  const jobRuled = await escrow.connect(arbiter).arbitrate(jobId_5, ethers.utils.parseUnits("1", "ether"),"I side with seller!");
+  const jobRuled_receipt = await jobRuled.wait();
+  console.log("Job ruled by arbiter in favor of seller");
+
+  const ruling = await escrow.connect(arbiter).arbiterOpinionUris(jobId_5);
+  console.log("Arbiter ruling: ", ruling);
 
 }
 
