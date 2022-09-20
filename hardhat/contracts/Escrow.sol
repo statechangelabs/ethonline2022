@@ -188,7 +188,7 @@ contract Escrow is Ownable {
         newJob.buyerAccepted = true;
         newJob.sellerAccepted = false;
         jobs.push(newJob);
-        // USDC.transferFrom(buyer, address(this), amount); // buyer needs to approve this contract to spend USDC
+        USDC.transferFrom(buyer, address(this), amount); // buyer needs to approve this contract to spend USDC
         emit BidCreated(_counter.current(), newJob.buyer, newJob.seller);
         _counter.increment();
     }
@@ -276,7 +276,7 @@ contract Escrow is Ownable {
         require(buyer == job.buyer);
         job.buyerAccepted = true;
         require(job.buyerAccepted && job.sellerAccepted);
-        // USDC.transferFrom(buyer, address(this), job.amount);
+        USDC.transferFrom(buyer, address(this), job.amount);
         job.status = State.AWAITING_DELIVERY;
         emit OfferAccepted(jobId, job.buyer, job.seller);
     }
@@ -324,7 +324,7 @@ contract Escrow is Ownable {
         Job storage job = jobs[jobId];
         require(buyer == job.buyer);
         job.status = State.COMPLETE;
-        // USDC.transferFrom(address(this), job.seller, job.amount);
+        USDC.transferFrom(address(this), job.seller, job.amount);
         emit Receipt(jobId, job.seller);
     }
 
@@ -353,7 +353,7 @@ contract Escrow is Ownable {
             );
             if (job.buyerAccepted) {
                 job.status = State.REFUNDED;
-                // USDC.transfer(address(this), job.buyer, job.amount);
+                USDC.transferFrom(address(this), job.buyer, job.amount);
                 emit Refunded(jobId, job.buyer);
             } else {
                 job.status = State.CANCELLED;
@@ -364,7 +364,7 @@ contract Escrow is Ownable {
                 if (job.buyerAccepted) {
                     job.status = State.CANCELLED;
                     emit Cancelled(jobId, job.buyer, job.seller);
-                    // USDC.transfer(address(this), job.buyer, job.amount);
+                    USDC.transferFrom(address(this), job.buyer, job.amount);
                 } else {
                     job.status = State.CANCELLED;
                     emit Cancelled(jobId, job.buyer, job.seller);
@@ -529,11 +529,11 @@ contract Escrow is Ownable {
 
         job.status = State.COMPLETE;
         if (amount > 0) {
-            // USDC.transferFrom(address(this), job.seller, amount);
+            USDC.transferFrom(address(this), job.seller, amount);
         }
         if (amount < job.amount) {
             // need to understand this
-            // USDC.transferFrom(address(this), job.seller, job.amount - amount);
+            USDC.transferFrom(address(this), job.seller, job.amount - amount);
         }
 
         emit Arbitrated(jobId, job.buyer, job.seller);
