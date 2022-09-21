@@ -49,8 +49,13 @@ contract Escrow is Ownable {
         address indexed buyer,
         address indexed seller
     );
-
     event PartialOffered(
+        uint256 indexed jobID,
+        address indexed buyer,
+        address indexed seller,
+        uint256 amount
+    );
+    event PartialCompletion(
         uint256 indexed jobID,
         address indexed buyer,
         address indexed seller,
@@ -388,6 +393,51 @@ contract Escrow is Ownable {
         }
     }
 
+    function partialOffer(
+        uint256 jobId,
+        uint256 amount,
+        address offerer
+    ) external {
+        _partialOffer(jobId, amount, msg.sender);
+    }
+
+    function partialOfferFor(
+        uint256 jobId,
+        uint256 amount,
+        address offerer,
+        bytes memory signature
+    ) external {
+        require(
+            offerer == checkSigner("I am offering this partial job.", signature)
+        );
+        _partialOffer(jobId, amount, offerer);
+    }
+
+    function _partialOffer(
+        uint256 jobId,
+        uint256 amount,
+        address offerer
+    ) internal {
+        Job storage job = jobs[jobId];
+        require(amount < job.amount);
+        require(
+            job.status == State.AWAITING_ACCEPTANCE ||
+                job.status == State.AWAITING_DELIVERY
+        ); // Job must be awaiting acceptance or delivery ??
+        require(offerer == job.seller || offerer == job.buyer); // buyer or seller
+        job.partialOffer = amount;
+        job.partialOfferer = offerer;
+        if (offerer == job.buyer) {
+            // sending the rest back to the buyer
+            USDC.approve(address(this), job.amount - amount);
+            USDC.transferFrom(offerer, address(this), job.amount - amount);
+            job.status = State.AWAITING_ACCEPTANCE;
+        } else {
+            job.status = State.AWAITING_ACCEPTANCE;
+        }
+        emit PartialOffered(jobId, job.buyer, job.seller, job.partialOffer);
+    }
+
     function partialCompletion(uint256 jobId, uint256 amount) external {
         _partialCompletion(jobId, amount, msg.sender);
     }
@@ -450,7 +500,12 @@ contract Escrow is Ownable {
         } else {
             job.partialOffer = amount;
             job.partialOfferer = offerer;
-            emit PartialOffered(jobId, job.buyer, job.seller, job.partialOffer);
+            emit PartialCompletion(
+                jobId,
+                job.buyer,
+                job.seller,
+                job.partialOffer
+            );
         }
     }
 
