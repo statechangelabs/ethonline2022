@@ -188,13 +188,12 @@ contract Escrow is Ownable {
         newJob.buyerAccepted = true;
         newJob.sellerAccepted = false;
         jobs.push(newJob);
-        console.log("Buyer balance");
-        console.log(USDC.balanceOf(buyer));
-        console.log(amount);
-        // USDC.allowance(address, amount);
-        // USDC.approve(address(this), amount);
+
+        console.log(_counter.current());
         USDC.transferFrom(buyer, address(this), amount); // buyer needs to approve this contract to spend USDC
+        console.log("Bid created event firing now.");
         emit BidCreated(_counter.current(), newJob.buyer, newJob.seller);
+        console.log("Bid created event emitted above this.");
         _counter.increment();
     }
 
@@ -212,7 +211,9 @@ contract Escrow is Ownable {
     }
 
     function _acceptBid(uint256 jobId, address seller) internal {
+        console.log("Seller balance");
         Job storage job = jobs[jobId];
+        console.log("here");
         require(seller == job.seller);
         job.sellerAccepted = true;
         require(job.buyerAccepted && job.sellerAccepted);
@@ -329,6 +330,7 @@ contract Escrow is Ownable {
         Job storage job = jobs[jobId];
         require(buyer == job.buyer);
         job.status = State.COMPLETE;
+        USDC.approve(address(this), job.amount);
         USDC.transferFrom(address(this), job.seller, job.amount);
         emit Receipt(jobId, job.seller);
     }

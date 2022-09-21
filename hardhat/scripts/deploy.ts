@@ -2,10 +2,12 @@ import { ethers } from "hardhat";
 console.log("Starting");
 
 async function main2() {
-  const [owner, _buyer, seller, arbiter] = await ethers.getSigners();
+  const [owner, _buyer, _seller, _arbiter] = await ethers.getSigners();
   const buyer = await ethers.getImpersonatedSigner(
     "0xF7fF442a8184E113476b68F5d2cFEE57ad1ae6DE"
   );
+  const seller = await ethers.getImpersonatedSigner("0xf6736A845fD69c4ceb24Bb09C4089273F3690543");
+  const arbiter = await ethers.getImpersonatedSigner("0x90f14e3282977416286085e0d90210A400bEFD22");
   // const buyer = new ethers.Wallet(process.env.AKSHAYKEY, owner.provider);
   const Escrow = await ethers.getContractFactory("Escrow");
   const escrow = await Escrow.deploy();
@@ -18,12 +20,6 @@ async function main2() {
   console.log("Seller address: ", seller.address);
   console.log("Arbiter address: ", arbiter.address);
   console.log("\n\n");
-
-  // Happy Path 1: Buyer creates a job, deposits funds, seller accepts and delivers then buyer recieves and seller withdraws
-  console.log(
-    "Happy Path 1: Buyer creates a job, deposits funds, seller accepts and delivers then buyer recieves and seller withdraws"
-  );
-  console.log("Creating a new job bid from the buyer");
   const abi = [
     {
       anonymous: false,
@@ -800,20 +796,37 @@ async function main2() {
       type: "function",
     },
   ];
+
   const USDC_ADDRESS = "0xe11A86849d99F524cAC3E7A0Ec1241828e332C62";
   const USDC = new ethers.Contract(USDC_ADDRESS, abi, buyer);
   const bidAmount = ethers.utils.parseUnits("1", "ether");
+
+  // Happy Path 1: Buyer creates a job, deposits funds, seller accepts and delivers then buyer recieves and seller withdraws
+  console.log(
+    "Happy Path 1: Buyer creates a job, deposits funds, seller accepts and delivers then buyer recieves and seller withdraws"
+  );
+  console.log("Creating a new job bid from the buyer");
+  const checkAllowance = await USDC.allowance(buyer.address, escrow.address);
+  // checking allowance before approval
+  console.log("Allowance: ", checkAllowance.toString());
+  // buyer approves USDC contract to spend 1 USDC
   const usdcTxn = await USDC.approve(escrowAddress, bidAmount);
   await usdcTxn.wait();
+  // checking allowance after approval
+  const checkAllowance2 = await USDC.allowance(buyer.address, escrow.address);
+  console.log("Allowance: ", checkAllowance2.toString());
+
   const jobBid = await escrow
     .connect(buyer)
     .bid(bidAmount, seller.address, arbiter.address);
   const jobBid_receipt = await jobBid.wait();
-  const jobId_1 = parseInt(jobBid_receipt.logs[0].topics[1], 16);
+  // console.log(jobBid_receipt.logs[2] );
+  const jobId_1 = parseInt(jobBid_receipt.logs[2].topics[1]);
   console.log("Job bid created");
 
   // Accept the job bid from the seller
   console.log("Accepting the job bid from the seller");
+  console.log({ jobId_1 });
   const bidAccept = await escrow.connect(seller).acceptBid(jobId_1);
   const bidAccept_receipt = await bidAccept.wait();
   console.log("Job bid accepted");
@@ -843,10 +856,16 @@ async function main2() {
     );
   const jobOffer_receipt_2 = await jobOffer.wait();
   const jobId_2 = parseInt(jobOffer_receipt_2.logs[0].topics[1], 16);
+  console.log(jobOffer_receipt_2.logs[0]);
   console.log("Job Offer created");
+  
+  // Buyer allows escrow contract to spend 1 USDC
+  const usdcTxn_2 = await USDC.approve(escrowAddress, bidAmount);
+  await usdcTxn_2.wait();
+  
 
   // Accept the job bid from the seller
-  console.log("Buyer Accepting the job bid from the seller");
+  console.log("Buyer Accepting the job offer from the seller");
   const offerAccept = await escrow.connect(buyer).acceptOffer(jobId_2);
   const offerAccept_receipt = await offerAccept.wait();
   console.log("Offer accepted");
