@@ -886,6 +886,10 @@ async function main2() {
   console.log(
     "Happy Path 3: Buyer creates a job, deposits funds, seller accepts but cancels the job later"
   );
+  const buyer_balance_before = await USDC.balanceOf(buyer.address);
+  console.log("Buyer balance before: ", buyer_balance_before.toString());
+  const usdcTxn_3 = await USDC.approve(escrowAddress, bidAmount);
+  await usdcTxn_3.wait();
   console.log("Creating a new job bid from the buyer");
   const jobBid_2 = await escrow
     .connect(buyer)
@@ -895,7 +899,7 @@ async function main2() {
       arbiter.address
     );
   const jobBid_receipt_2 = await jobBid_2.wait();
-  const jobId_3 = parseInt(jobBid_receipt_2.logs[0].topics[1], 16);
+  const jobId_3 = parseInt(jobBid_receipt_2.logs[2].topics[1], 16);
   console.log("Job bid created");
 
   // Accept the job bid from the seller
@@ -904,11 +908,20 @@ async function main2() {
   const bidAccept_receipt_2 = await bidAccept_2.wait();
   console.log("Job bid accepted");
 
+  const buyer_balance_during = await USDC.balanceOf(buyer.address);
+  console.log("Buyer balance during the process: ", buyer_balance_during.toString());
+
   console.log("Seller cancels the job.");
   const jobCancelled = await escrow.connect(seller).cancel(jobId_3);
   const jobCancelled_receipt = await jobCancelled.wait();
   console.log("Job cancelled by seller");
 
+  const buyer_balance_after = await USDC.balanceOf(buyer.address);
+  console.log("Buyer balance after: ", buyer_balance_after.toString());
+  if (buyer_balance_after.toString() === buyer_balance_before.toString()) {
+    console.log("Buyer balance is the same after seller cancelled the job");
+  }
+  
   console.log("\n-------------------\n");
 
   // Happy Path 4: Buyer creates a job but cancels before seller accepts
@@ -916,6 +929,8 @@ async function main2() {
     "Happy Path 4: Buyer creates a job but cancels before seller accepts"
   );
   console.log("Creating a new job bid from the buyer");
+  const usdcTxn_4 = await USDC.approve(escrowAddress, bidAmount);
+  await usdcTxn_4.wait();
   const jobBid_3 = await escrow
     .connect(buyer)
     .bid(
@@ -924,7 +939,7 @@ async function main2() {
       arbiter.address
     );
   const jobBid_receipt_3 = await jobBid_3.wait();
-  const jobId_4 = parseInt(jobBid_receipt_3.logs[0].topics[1], 16);
+  const jobId_4 = parseInt(jobBid_receipt_3.logs[2].topics[1], 16);
   console.log("Job bid created");
 
   console.log("Buyer cancels the job.");
@@ -935,9 +950,17 @@ async function main2() {
   console.log("\n-------------------\n");
   // Happy Path 5: Buyer creates a job, deposits funds, seller accepts and delivers but buyer disputes the job and arbiter rules in favour of seller.
   console.log(
-    "Happy Path 5: Buyer creates a job, deposits funds, seller accepts and delivers but buyer disputes the job"
+    "Happy Path 5: Buyer creates a job, deposits funds, seller accepts and delivers but buyer disputes the job and arbiter rules in favour of seller."
   );
   console.log("Creating a new job bid from the buyer");
+  const usdcTxn_5 = await USDC.approve(escrowAddress, bidAmount);
+  await usdcTxn_5.wait();
+
+  const buyer_balance_before_2 = await USDC.balanceOf(buyer.address);
+  console.log("Buyer balance before: ", buyer_balance_before_2.toString());
+  const seller_balance_before_2 = await USDC.balanceOf(seller.address);
+  console.log("Seller balance before: ", seller_balance_before_2.toString()); 
+
   const jobBid_4 = await escrow
     .connect(buyer)
     .bid(
@@ -946,7 +969,7 @@ async function main2() {
       arbiter.address
     );
   const jobBid_receipt_4 = await jobBid_4.wait();
-  const jobId_5 = parseInt(jobBid_receipt_4.logs[0].topics[1], 16);
+  const jobId_5 = parseInt(jobBid_receipt_4.logs[2].topics[1], 16);
   console.log("Job bid created");
 
   console.log("Accepting the job bid from the seller");
@@ -977,6 +1000,12 @@ async function main2() {
 
   const ruling = await escrow.connect(arbiter).arbiterOpinionUris(jobId_5);
   console.log("Arbiter ruling: ", ruling);
+
+  const buyer_balance_after_2 = await USDC.balanceOf(buyer.address);
+  console.log("Buyer balance after: ", buyer_balance_after_2.toString());
+  const seller_balance_after_2 = await USDC.balanceOf(seller.address);
+  console.log("Seller balance before: ", seller_balance_after_2.toString()); 
+
 }
 
 // We recommend this pattern to be able to use async/await everywhere

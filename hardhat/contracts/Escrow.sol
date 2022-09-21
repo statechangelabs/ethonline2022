@@ -360,8 +360,9 @@ contract Escrow is Ownable {
             );
             if (job.buyerAccepted) {
                 job.status = State.REFUNDED;
-                USDC.transferFrom(address(this), job.buyer, job.amount);
                 emit Refunded(jobId, job.buyer);
+                USDC.approve(address(this), job.amount);
+                USDC.transferFrom(address(this), job.buyer, job.amount);
             } else {
                 job.status = State.CANCELLED;
                 emit Cancelled(jobId, job.buyer, job.seller);
@@ -371,6 +372,7 @@ contract Escrow is Ownable {
                 if (job.buyerAccepted) {
                     job.status = State.CANCELLED;
                     emit Cancelled(jobId, job.buyer, job.seller);
+                    USDC.approve(address(this), job.amount);
                     USDC.transferFrom(address(this), job.buyer, job.amount);
                 } else {
                     job.status = State.CANCELLED;
@@ -536,10 +538,12 @@ contract Escrow is Ownable {
 
         job.status = State.COMPLETE;
         if (amount > 0) {
+            USDC.approve(address(this), amount);
             USDC.transferFrom(address(this), job.seller, amount);
         }
         if (amount < job.amount) {
             // need to understand this
+            USDC.approve(address(this), job.amount - amount);
             USDC.transferFrom(address(this), job.seller, job.amount - amount);
         }
 
