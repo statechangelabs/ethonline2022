@@ -9,12 +9,16 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "hardhat/console.sol";
 import "@polydocs/contracts/contracts/interfaces/MetadataURI.sol";
+import "@polydocs/contracts/contracts/termsable/TermsableNoToken.sol";
+import "./BuyerRegistry.sol";
+import "./SellerRegistry.sol";
 
 // import "./Review.sol";
 
 contract Escrow is Ownable {
     using Counters for Counters.Counter;
-
+    BuyerRegistry _buyerRegistry;
+    SellerRegistry _sellerRegistry;
     event BidCreated(
         uint256 indexed jobID,
         address indexed buyer,
@@ -113,6 +117,14 @@ contract Escrow is Ownable {
         USDC = IERC20(0xe11A86849d99F524cAC3E7A0Ec1241828e332C62);
     }
 
+    function setBuyerRegistry(address buyerRegistry) external onlyOwner {
+        _buyerRegistry = BuyerRegistry(buyerRegistry);
+    }
+
+    function setSellerRegistry(address sellerRegistry) external onlyOwner {
+        _sellerRegistry = SellerRegistry(sellerRegistry);
+    }
+
     /// @notice This is the latest block height at which the terms were updated.
     /// @dev This is the latest block height at which the terms were updated. 0 by default.
     // uint256 _lastTermChange = 0;
@@ -174,6 +186,7 @@ contract Escrow is Ownable {
     ) external {
         // string memory message = "I intend to bid for this job.";
         require(buyer == checkSigner("I am hiring for this job.", signature));
+
         _bid(amount, seller, arbiter, buyer);
     }
 
@@ -184,6 +197,10 @@ contract Escrow is Ownable {
         address arbiter,
         address buyer
     ) internal {
+        require(
+            _buyerRegistry.acceptedTerms(buyer),
+            "Terms not accepted by buyer"
+        );
         Job memory newJob;
         newJob.amount = amount;
         newJob.buyer = buyer;
@@ -194,11 +211,8 @@ contract Escrow is Ownable {
         newJob.sellerAccepted = false;
         jobs.push(newJob);
 
-        console.log(_counter.current());
         USDC.transferFrom(buyer, address(this), amount); // buyer needs to approve this contract to spend USDC
-        console.log("Bid created event firing now.");
         emit BidCreated(_counter.current(), newJob.buyer, newJob.seller);
-        console.log("Bid created event emitted above this.");
         _counter.increment();
     }
 
@@ -212,13 +226,16 @@ contract Escrow is Ownable {
         bytes memory signature
     ) external {
         require(seller == checkSigner("I am accepting this job.", signature));
+
         _acceptBid(jobID, seller);
     }
 
     function _acceptBid(uint256 jobId, address seller) internal {
-        console.log("Seller balance");
+        require(
+            _sellerRegistry.acceptedTerms(seller),
+            "Terms not accepted by seller"
+        );
         Job storage job = jobs[jobId];
-        console.log("here");
         require(seller == job.seller);
         job.sellerAccepted = true;
         require(job.buyerAccepted && job.sellerAccepted);
@@ -242,6 +259,7 @@ contract Escrow is Ownable {
         bytes memory signature
     ) external {
         require(seller == checkSigner("I am offering this job.", signature));
+
         _offer(amount, buyer, arbiter, seller);
     }
 
@@ -251,8 +269,11 @@ contract Escrow is Ownable {
         address arbiter,
         address seller
     ) internal {
+        require(
+            _sellerRegistry.acceptedTerms(seller),
+            "Terms not accepted by seller"
+        );
         Job memory newJob;
-
         newJob.amount = amount;
         newJob.buyer = buyer;
         newJob.status = State.AWAITING_ACCEPTANCE;
@@ -279,10 +300,15 @@ contract Escrow is Ownable {
             buyer ==
                 checkSigner("I am accepting the offer for this job.", signature)
         );
+
         _acceptOffer(jobId, buyer);
     }
 
     function _acceptOffer(uint256 jobId, address buyer) internal {
+        require(
+            _buyerRegistry.acceptedTerms(buyer),
+            "Terms not accepted by buyer"
+        );
         Job storage job = jobs[jobId];
         require(buyer == job.buyer);
         job.buyerAccepted = true;
@@ -393,11 +419,7 @@ contract Escrow is Ownable {
         }
     }
 
-    function partialOffer(
-        uint256 jobId,
-        uint256 amount,
-        address offerer
-    ) external {
+    function partialOffer(uint256 jobId, uint256 amount) external {
         _partialOffer(jobId, amount, msg.sender);
     }
 
@@ -420,10 +442,7 @@ contract Escrow is Ownable {
     ) internal {
         Job storage job = jobs[jobId];
         require(amount < job.amount);
-        require(
-            job.status == State.AWAITING_ACCEPTANCE ||
-                job.status == State.AWAITING_DELIVERY
-        ); // Job must be awaiting acceptance or delivery ??
+        require(job.status == State.AWAITING_DELIVERY); // Job must be awaiting acceptance or delivery ??
         require(offerer == job.seller || offerer == job.buyer); // buyer or seller
         job.partialOffer = amount;
         job.partialOfferer = offerer;
