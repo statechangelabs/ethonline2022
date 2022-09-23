@@ -187,10 +187,10 @@ const Main: FC = () => {
 const SubMain: FC = () => {
   return (
     <Routes>
-      <Route path="/" element={<Selector />} />
+      {/* <Route path="/" element={<Selector />} />
       <Route path="/client" element={<Client />} />
       <Route path="/expert" element={<Expert />} />
-      <Route path="/arbiter" element={<Arbiter />} />
+      <Route path="/arbiter" element={<Arbiter />} /> */}
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   );
