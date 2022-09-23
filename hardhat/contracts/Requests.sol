@@ -92,6 +92,7 @@ contract Requests is Ownable {
     }
 
     function getOffer(uint256 offerId) public view returns (Offer memory) {
+        // console.log("Length of _offers: ", _offers.length);
         return _offers[offerId];
     }
 
@@ -100,65 +101,131 @@ contract Requests is Ownable {
         string memory _uri,
         address _arbiter
     ) external {
+        _makeRequest(_price, _uri, _arbiter, msg.sender);
+    }
+
+    function makeRequestFor(
+        uint256 _price,
+        string memory _uri,
+        address _arbiter,
+        address _buyer
+    ) external {
+        _makeRequest(_price, _uri, _arbiter, _buyer);
+    }
+
+    function _makeRequest(
+        uint256 _price,
+        string memory _uri,
+        address _arbiter,
+        address _buyer
+    ) internal {
         require(
-            _buyerRegistry.acceptedTerms(msg.sender),
+            _buyerRegistry.acceptedTerms(_buyer),
             "Buyer has not accepted terms"
         );
         Request memory newRequest;
-        newRequest.buyer = msg.sender;
+        newRequest.buyer = _buyer;
         newRequest.price = _price;
         newRequest.uri = _uri;
         newRequest.state = RequestState.OPEN;
         newRequest.arbiter = _arbiter;
         _requests.push(newRequest);
-        emit NewRequest(msg.sender, _requestId.current(), _price);
+        emit NewRequest(_buyer, _requestId.current(), _price);
         _requestId.increment();
     }
 
     function makeOffer(
-        uint256 requestId,
+        uint256 __requestId,
         uint256 _price,
         string memory _uri,
         address _arbiter
     ) external {
+        _makeOffer(__requestId, _price, _uri, _arbiter, msg.sender);
+    }
+
+    function makeOfferFor(
+        uint256 __requestId,
+        uint256 _price,
+        string memory _uri,
+        address _arbiter,
+        address _seller
+    ) external {
+        _makeOffer(__requestId, _price, _uri, _arbiter, _seller);
+    }
+
+    function _makeOffer(
+        uint256 requestId,
+        uint256 _price,
+        string memory _uri,
+        address _arbiter,
+        address _seller
+    ) internal {
         require(
-            _sellerRegistry.acceptedTerms(msg.sender),
+            _sellerRegistry.acceptedTerms(_seller),
             "Seller has not accepted terms"
         );
         Offer memory newOffer;
-        newOffer.seller = msg.sender;
+        newOffer.seller = _seller;
         newOffer.price = _price;
         newOffer.uri = _uri;
         newOffer.requestId = requestId;
         newOffer.state = OfferState.OPEN;
         newOffer.arbiter = _arbiter;
-        emit NewOffer(msg.sender, requestId, _offerId.current(), _price);
+        _offers.push(newOffer);
+        emit NewOffer(_seller, requestId, _offerId.current(), _price);
         _offerId.increment();
     }
 
     function acceptOffer(uint256 offerId) external {
+        _acceptOffer(offerId, msg.sender);
+    }
+
+    function acceptOfferFor(uint256 offerId, address buyer) external {
+        _acceptOffer(offerId, buyer);
+    }
+
+    function _acceptOffer(uint256 offerId, address _buyer) internal {
         // Request memory request;
         require(
-            _buyerRegistry.acceptedTerms(msg.sender),
+            _buyerRegistry.acceptedTerms(_buyer),
             "Buyer has not accepted terms"
         );
-        Offer storage _offer = _offers[offerId];
+        Offer memory _offer = getOffer(offerId);
         require(_offer.state == OfferState.OPEN, "Offer is not open");
-        Request storage _request = _requests[_offer.requestId];
+        Request memory _request = _requests[_offer.requestId];
         require(_request.state == RequestState.OPEN, "Request is not open");
         require(
-            _request.buyer == msg.sender,
+            _request.buyer == _buyer,
             "Only the buyer can accept the offer"
         );
         _offer.state = OfferState.ACCEPTED;
         _request.state = RequestState.ACCEPTED;
 
-        _escrow.bid(_offer.price, _offer.seller, _offer.arbiter);
-        emit OfferAccepted(msg.sender, _offer.seller, _offer.requestId);
+        // delegate call escrow to bid on the offer in this contracts context
+        address _escrowAddress = address(_escrow);
+        // console.log(_buyerRegistry.acceptedTerms(_buyer));
+        (bool success, ) = _escrowAddress.delegatecall(
+            abi.encodeWithSelector(
+                _escrow.bid.selector,
+                _offer.price,
+                _offer.seller,
+                _offer.arbiter
+            )
+        );
+        require(success, "Escrow bid failed");
+        // _escrowAddress.delegatecall(
+        //     abi.encodeWithSignature(
+        //         "bid(uint256,address,address)",
+        //         _offer.price,
+        //         _offer.seller,
+        //         _offer.arbiter
+        //     )
+        // );
+        emit OfferAccepted(_buyer, _offer.seller, _offer.requestId);
     }
 
     function withdrawRequest(uint256 requestId) external {
-        Request storage _request = _requests[requestId];
+        Request memory _request = _requests[requestId];
         require(_request.state == RequestState.OPEN, "Request is not open");
         require(
             _request.buyer == msg.sender,
@@ -169,7 +236,7 @@ contract Requests is Ownable {
     }
 
     function withdrawOffer(uint256 offerId) external {
-        Offer storage _offer = _offers[offerId];
+        Offer memory _offer = getOffer(offerId);
         require(_offer.state == OfferState.OPEN, "Offer is not open");
         require(
             _offer.seller == msg.sender,

@@ -174,6 +174,7 @@ contract Escrow is Ownable {
         address seller,
         address arbiter
     ) external {
+        console.log(msg.sender);
         _bid(amount, seller, arbiter, msg.sender);
     }
 
@@ -185,7 +186,7 @@ contract Escrow is Ownable {
         bytes memory signature
     ) external {
         // string memory message = "I intend to bid for this job.";
-        require(buyer == checkSigner("I am hiring for this job.", signature));
+        require(buyer == checkSigner("I am hiring", signature));
 
         _bid(amount, seller, arbiter, buyer);
     }
@@ -197,10 +198,16 @@ contract Escrow is Ownable {
         address arbiter,
         address buyer
     ) internal {
-        require(
-            _buyerRegistry.acceptedTerms(buyer),
-            "Terms not accepted by buyer"
-        );
+        // console.log(buyer);
+        console.log("Seller registry", address(_sellerRegistry));
+        console.log("Buyer registry", address(_buyerRegistry));
+        console.log("This address", address(this));
+        // console.log("This is here: ", _sellerRegistry.acceptedTerms(buyer));
+        // console.log("This is here 2 : ", _buyerRegistry.acceptedTerms(seller));
+        // require(
+        //     _buyerRegistry.acceptedTerms(buyer),
+        //     "Terms not accepted by buyer"
+        // );
         Job memory newJob;
         newJob.amount = amount;
         newJob.buyer = buyer;
@@ -210,8 +217,9 @@ contract Escrow is Ownable {
         newJob.buyerAccepted = true;
         newJob.sellerAccepted = false;
         jobs.push(newJob);
-
+        // console.log("We here 2");
         USDC.transferFrom(buyer, address(this), amount); // buyer needs to approve this contract to spend USDC
+        // console.log("We here 3");
         emit BidCreated(_counter.current(), newJob.buyer, newJob.seller);
         _counter.increment();
     }
