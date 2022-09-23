@@ -30,12 +30,14 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "./BuyerRegistry.sol";
 import "./SellerRegistry.sol";
 import "./Requests.sol";
+import "./Escrow.sol";
 
 // add the part where a message can be sent if you are a registered buyer/seller
 contract Messaging is Ownable {
     Requests _requestsContract;
     BuyerRegistry _buyerRegistry;
     SellerRegistry _sellerRegistry;
+    Escrow _escrow;
 
     mapping(address => bytes) private publicKeys;
     mapping(address => string[]) private _messages;
@@ -70,6 +72,10 @@ contract Messaging is Ownable {
 
     function setSellerRegistry(address sellerRegistry) external onlyOwner {
         _sellerRegistry = SellerRegistry(sellerRegistry);
+    }
+
+    function setEscrow(address escrow) external onlyOwner {
+        _escrow = Escrow(escrow);
     }
 
     function setGlobalMessagingFee(uint256 _newMessagingFee) public onlyOwner {
@@ -140,17 +146,17 @@ contract Messaging is Ownable {
     // 1. offer exists
     // 2. sender is the seller
     // 3. receipient is the buyer on the request on the offer
-    function messageBuyerAboutOffer(
+    function messageBuyerAboutRequest(
         string memory message,
         address buyerAddress,
-        uint256 offerId
+        uint256 requestId
     ) public {
-        Requests.Offer memory offer = _requestsContract.getOffer(offerId);
-        uint256 requestId = offer.requestId;
+        // Requests.Offer memory offer = _requestsContract.getOffer(offerId);
+        // uint256 requestId = offer.requestId;
         Requests.Request memory request = _requestsContract.getRequest(
             requestId
         );
-        require(offer.state == Requests.OfferState.OPEN); // need to check if offer is open??
+        require(request.state == Requests.RequestState.OPEN);
         require(
             _sellerRegistry.acceptedTerms(msg.sender),
             "You are not a registered seller"
@@ -178,26 +184,27 @@ contract Messaging is Ownable {
     function sendMessageForJob(
         string memory message,
         address buyerAddress,
-        uint256 offerId
+        uint256 jobId
     ) external {
-        Requests.Offer memory offer = _requestsContract.getOffer(offerId);
-        uint256 requestId = offer.requestId;
-        Requests.Request memory request = _requestsContract.getRequest(
-            requestId
-        );
+        Escrow.Job memory job = _escrow.getJob(jobId);
+        // Requests.Offer memory offer = _requestsContract.getOffer(offerId);
+        // uint256 requestId = offer.requestId;
+        // Requests.Request memory request = _requestsContract.getRequest(
+        //     requestId
+        // );
         require(
             _buyerRegistry.acceptedTerms(buyerAddress),
             "You are not messaging a registered buyer"
         );
         require(
-            _sellerRegistry.acceptedTerms(offer.seller),
+            _sellerRegistry.acceptedTerms(job.seller),
             "Seller hasn't accepted terms"
         );
+        require(job.buyer == buyerAddress, "You are not messaging the buyer");
         require(
-            request.buyer == buyerAddress,
-            "You are not messaging the buyer"
+            job.status != Escrow.State.AWAITING_ACCEPTANCE,
+            "Job not accepted"
         );
-        require(request.state == Requests.RequestState.ACCEPTED);
         require(
             bytes(publicKeys[buyerAddress]).length > 0,
             "Recipient public key not added"
