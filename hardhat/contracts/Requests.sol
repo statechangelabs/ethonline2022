@@ -91,6 +91,10 @@ contract Requests is Ownable {
         return _requests[requestId];
     }
 
+    function getOffer(uint256 offerId) public view returns (Offer memory) {
+        return _offers[offerId];
+    }
+
     function makeRequest(
         uint256 _price,
         string memory _uri,
