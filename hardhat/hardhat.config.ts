@@ -12,11 +12,13 @@ const config: HardhatUserConfig = {
       forking: {
         url: process.env.ALCHEMY_MUMBAI || "",
       },
+      allowUnlimitedContractSize: true,
     },
     polygonMumbai: process.env.ALCHEMY_MUMBAI
       ? {
           url: process.env.ALCHEMY_MUMBAI,
           accounts: [process.env.PK || ""],
+          gas: 8000000,
         }
       : undefined,
     polygon: process.env.ALCHEMY_POLYGON
