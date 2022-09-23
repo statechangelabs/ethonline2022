@@ -7,12 +7,10 @@ import {
   Link,
   useNavigate,
 } from "react-router-dom";
-import Editor from "./Editor";
 import Logo from "./logo.png";
 import { MenuIcon, XIcon } from "@heroicons/react/outline";
 import Topography from "./topography.svg";
 import Disconnected from "./Disconnected";
-import KnownTemplates from "./KnownTemplates";
 
 function classNames(...classes: string[]) {
   return classes.filter(Boolean).join(" ");
@@ -187,8 +185,6 @@ const Main: FC = () => {
 const SubMain: FC = () => {
   return (
     <Routes>
-      <Route path="/templates" element={<KnownTemplates />} />
-      <Route path="/templates/:templateId" element={<Editor />} />
       <Route path="*" element={<Disconnected />} />
     </Routes>
   );
