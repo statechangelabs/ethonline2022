@@ -34,6 +34,8 @@ import "./Requests.sol";
 // add the part where a message can be sent if you are a registered buyer/seller
 contract Messaging is Ownable {
     Requests _requestsContract;
+    BuyerRegistry _buyerRegistry;
+    SellerRegistry _sellerRegistry;
 
     mapping(address => bytes) private publicKeys;
     mapping(address => string[]) private _messages;
@@ -58,8 +60,16 @@ contract Messaging is Ownable {
         uint256 _messagingFee
     );
 
-    function setRequestsContract(address requestsContract) public onlyOwner {
+    function setRequestsContract(address requestsContract) external onlyOwner {
         _requestsContract = Requests(requestsContract);
+    }
+
+    function setBuyerRegistry(address buyerRegistry) external onlyOwner {
+        _buyerRegistry = BuyerRegistry(buyerRegistry);
+    }
+
+    function setSellerRegistry(address sellerRegistry) external onlyOwner {
+        _sellerRegistry = SellerRegistry(sellerRegistry);
     }
 
     function setGlobalMessagingFee(uint256 _newMessagingFee) public onlyOwner {
@@ -103,21 +113,16 @@ contract Messaging is Ownable {
         return _globalMessagingFee;
     }
 
-    function sendMessageForJob(string memory message, uint256 jobId) external {}
-
-    function sendMessageForOffer(string memory message, uint256 offerId)
-        external
-    {}
-
-    function sendMessageTo(
-        string memory _message,
-        address payable _address,
-        uint256 _requestId
-    ) public payable {
-        // Requests.Request memory _request = _requestsContract.getRequest(
-        //     _requestId
-        // );
-        // Requests.Offer memory _offer = _requestsContract.getOffer();
+    // validate that sender is a buyer and to whom the message is going is a valid seller
+    function messageSeller(string memory _message, address _address) external {
+        require(
+            _buyerRegistry.acceptedTerms(msg.sender),
+            "You are not a registered buyer"
+        );
+        require(
+            _sellerRegistry.acceptedTerms(_address),
+            "You are not messaging a registered seller"
+        );
         require(
             bytes(publicKeys[_address]).length > 0,
             "Recipient public key not added"
@@ -126,32 +131,127 @@ contract Messaging is Ownable {
             bytes(publicKeys[msg.sender]).length > 0,
             "You must register a public key to send a message"
         );
-        if (_messagingFeeWhiteList[_address][msg.sender] > 0) {
-            require(
-                msg.value ==
-                    _messagingFeeWhiteList[_address][msg.sender] +
-                        _globalMessagingFee,
-                "Incorrect messaging fee"
-            );
-        } else if (_messagingFee[_address] > 0) {
-            require(
-                msg.value == _messagingFee[_address] + _globalMessagingFee,
-                "Incorrect messaging fee"
-            );
-        } else {
-            require(
-                msg.value == _globalMessagingFee,
-                "Incorrect messaging fee"
-            );
-        }
-        _address.transfer(msg.value - _globalMessagingFee);
+        // _address.transfer(msg.value - _globalMessagingFee);
         emit Message(msg.sender, _address, _message);
     }
 
-    function withdraw(address payable _address, uint256 _amount)
-        public
-        onlyOwner
-    {
-        _address.transfer(_amount);
+    // negotiation phase
+    // validate that sender is a seller and to whom the message is going is a valid buyer and has a request placed
+    // 1. offer exists
+    // 2. sender is the seller
+    // 3. receipient is the buyer on the request on the offer
+    function messageBuyerAboutOffer(
+        string memory message,
+        address buyerAddress,
+        uint256 offerId
+    ) public {
+        Requests.Offer memory offer = _requestsContract.getOffer(offerId);
+        uint256 requestId = offer.requestId;
+        Requests.Request memory request = _requestsContract.getRequest(
+            requestId
+        );
+        require(offer.state == Requests.OfferState.OPEN); // need to check if offer is open??
+        require(
+            _sellerRegistry.acceptedTerms(msg.sender),
+            "You are not a registered seller"
+        );
+        require(
+            _buyerRegistry.acceptedTerms(buyerAddress),
+            "You are not messaging a registered buyer"
+        );
+        require(
+            request.buyer == buyerAddress,
+            "You are not messaging the buyer"
+        );
+        require(
+            bytes(publicKeys[buyerAddress]).length > 0,
+            "Recipient public key not added"
+        );
+        require(
+            bytes(publicKeys[msg.sender]).length > 0,
+            "You must register a public key to send a message"
+        );
+        emit Message(msg.sender, buyerAddress, message);
     }
+
+    // accepted offer phase
+    function sendMessageForJob(
+        string memory message,
+        address buyerAddress,
+        uint256 offerId
+    ) external {
+        Requests.Offer memory offer = _requestsContract.getOffer(offerId);
+        uint256 requestId = offer.requestId;
+        Requests.Request memory request = _requestsContract.getRequest(
+            requestId
+        );
+        require(
+            _buyerRegistry.acceptedTerms(buyerAddress),
+            "You are not messaging a registered buyer"
+        );
+        require(
+            _sellerRegistry.acceptedTerms(offer.seller),
+            "Seller hasn't accepted terms"
+        );
+        require(
+            request.buyer == buyerAddress,
+            "You are not messaging the buyer"
+        );
+        require(request.state == Requests.RequestState.ACCEPTED);
+        require(
+            bytes(publicKeys[buyerAddress]).length > 0,
+            "Recipient public key not added"
+        );
+        require(
+            bytes(publicKeys[msg.sender]).length > 0,
+            "You must register a public key to send a message"
+        );
+        emit Message(msg.sender, buyerAddress, message);
+    }
+
+    // function sendMessageTo(
+    //     string memory _message,
+    //     address payable _address,
+    //     uint256 _requestId
+    // ) public payable {
+    //     // Requests.Request memory _request = _requestsContract.getRequest(
+    //     //     _requestId
+    //     // );
+    //     // Requests.Offer memory _offer = _requestsContract.getOffer();
+    //     require(
+    //         bytes(publicKeys[_address]).length > 0,
+    //         "Recipient public key not added"
+    //     );
+    //     require(
+    //         bytes(publicKeys[msg.sender]).length > 0,
+    //         "You must register a public key to send a message"
+    //     );
+    //     if (_messagingFeeWhiteList[_address][msg.sender] > 0) {
+    //         require(
+    //             msg.value ==
+    //                 _messagingFeeWhiteList[_address][msg.sender] +
+    //                     _globalMessagingFee,
+    //             "Incorrect messaging fee"
+    //         );
+    //     } else if (_messagingFee[_address] > 0) {
+    //         require(
+    //             msg.value == _messagingFee[_address] + _globalMessagingFee,
+    //             "Incorrect messaging fee"
+    //         );
+    //     } else {
+    //         require(
+    //             msg.value == _globalMessagingFee,
+    //             "Incorrect messaging fee"
+    //         );
+    //     }
+    //     _address.transfer(msg.value - _globalMessagingFee);
+    //     emit Message(msg.sender, _address, _message);
+    // }
+
+    // function withdraw(address payable _address, uint256 _amount)
+    //     public
+    //     onlyOwner
+    // {
+    //     _address.transfer(_amount);
+    // }
 }
