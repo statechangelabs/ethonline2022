@@ -1,5 +1,5 @@
 {
-  "name": "hardhat-project",
+  "name": "@polygig/contracts",
   "devDependencies": {
     "@ethersproject/abi": "^5.7.0",
     "@ethersproject/providers": "^5.7.1",
